@@ -1,0 +1,3 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_encrypted_document,access_encrypted_document,odory.model_encrypted_document,,1,1,1,1
+access_server_database,access_server_database,odory.model_server_database,,1,1,1,1

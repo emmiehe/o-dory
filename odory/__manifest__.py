@@ -13,7 +13,9 @@ Reproducing Keyword Search and Document Retrieval in Encrypted File-storing Syst
     # any module necessary for this one to work correctly
     "depends": ["base"],
     "data": [
-        'security/ir.model.access.csv',
-        'views/server_database_views.xml'
+        "security/ir.model.access.csv",
+        "views/server_database_views.xml",
+        "wizard/odory_client_wizard_views.xml",
+        "views/odory_client_views.xml",
     ],
 }

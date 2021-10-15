@@ -1,3 +1,5 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
 access_encrypted_document,access_encrypted_document,odory.model_encrypted_document,,1,1,1,1
 access_server_database,access_server_database,odory.model_server_database,,1,1,1,1
+access_odory_client,access_odory_client,odory.model_odory_client,,1,1,1,1
+access_odory_client_wizard,access_odory_client_wizard,odory.model_odory_client_wizard,,1,1,1,1

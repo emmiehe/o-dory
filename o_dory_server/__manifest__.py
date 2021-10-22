@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 # Copyright (c) 2021, Emmie He <heemmie@gmail.com>
 {
-    "name": "ODORY",
-    "summary": "ODORY is a DORY-style end-to-end encrypted file-storing application.",
+    "name": "O-DORY Server",
+    "summary": "O-DORY is a DORY-style end-to-end encrypted file-storing application. This module contains functionalities of an O-DORY server.",
     "license": "LGPL-3",
     "description": """
 Reproducing Keyword Search and Document Retrieval in Encrypted File-storing Systems.
@@ -14,8 +14,7 @@ Reproducing Keyword Search and Document Retrieval in Encrypted File-storing Syst
     "depends": ["base"],
     "data": [
         "security/ir.model.access.csv",
-        "views/server_database_views.xml",
-        "wizard/odory_client_wizard_views.xml",
-        "views/odory_client_views.xml",
+        "data/server_database.xml",
+        "views/server_views.xml",
     ],
 }

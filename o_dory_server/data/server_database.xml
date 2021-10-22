@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <data noupdate="0">
+    <record id="server_database_demo1" model="server.database">
+      <field name="name">Database 1</field>
+      <field name="available">true</field>
+    </record>
+
+    <record id="server_database_demo2" model="server.database">
+      <field name="name">Database 2</field>
+      <field name="available">true</field>
+    </record>
+
+  </data>
+</odoo>

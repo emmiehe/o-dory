@@ -1,0 +1,3 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_o_dory_account,access_o_dory_account,o_dory_client.model_o_dory_account,,1,1,1,1
+access_client_wizard,access_client_wizard,o_dory_client.model_client_wizard,,1,1,1,1

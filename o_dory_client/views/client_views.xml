@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <data noupdate="0">
+
+    <!-- <record id="action_open_odory_client_wizard" model="ir.actions.act_window"> -->
+    <!--     <field name="name">Odory Client Wizard</field> -->
+    <!--     <field name="type">ir.actions.act_window</field> -->
+    <!--     <field name="res_model">odory.client.wizard</field> -->
+    <!--     <field name="view_mode">form</field> -->
+    <!--     <field name="view_id" ref="wizard_odory_client" /> -->
+    <!--     <field name="target">new</field> -->
+    <!-- </record> -->
+
+    <!-- <record id="action_open_odory_client_search_wizard" model="ir.actions.act_window"> -->
+    <!--     <field name="name">Odory Client Search Wizard</field> -->
+    <!--     <field name="type">ir.actions.act_window</field> -->
+    <!--     <field name="res_model">odory.client.wizard</field> -->
+    <!--     <field name="view_mode">form</field> -->
+    <!--     <field name="view_id" ref="wizard_odory_client_search" /> -->
+    <!--     <field name="target">new</field> -->
+    <!-- </record> -->
+
+    
+    <!-- <menuitem id="menu_odory_client_app" name="Odory Client" action="action_open_odory_client_wizard" sequence="20" active="1"/> -->
+    <!-- <menuitem id="menu_odory_client_app_search" name="Odory Client Search" action="action_open_odory_client_search_wizard" sequence="21" active="1"/> -->
+
+
+    <record id="action_client" model="ir.actions.act_window">
+      <field name="name">O-DORY Account</field>
+      <field name="res_model">o.dory.account</field>
+      <field name="view_mode">tree,form</field>
+      <field name="context">{}</field>
+    </record>
+   
+    <menuitem id="menu_o_dory_account" name="O-DORY Account" action="action_client" sequence="7" active="1"/>
+
+    
+  </data>
+</odoo>

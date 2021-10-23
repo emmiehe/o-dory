@@ -2,14 +2,24 @@
 <odoo>
   <data noupdate="0">
 
-    <!-- <record id="action_open_odory_client_wizard" model="ir.actions.act_window"> -->
-    <!--     <field name="name">Odory Client Wizard</field> -->
-    <!--     <field name="type">ir.actions.act_window</field> -->
-    <!--     <field name="res_model">odory.client.wizard</field> -->
-    <!--     <field name="view_mode">form</field> -->
-    <!--     <field name="view_id" ref="wizard_odory_client" /> -->
-    <!--     <field name="target">new</field> -->
-    <!-- </record> -->
+    <record id="action_client_upload_wizard" model="ir.actions.act_window">
+        <field name="name">Client Wizard</field>
+        <field name="type">ir.actions.act_window</field>
+        <field name="res_model">client.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="view_id" ref="wizard_client_upload" />
+        <field name="target">new</field>
+    </record>
+
+    
+    <record id="action_client_remove_wizard" model="ir.actions.act_window">
+        <field name="name">Client Wizard</field>
+        <field name="type">ir.actions.act_window</field>
+        <field name="res_model">client.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="view_id" ref="wizard_client_remove" />
+        <field name="target">new</field>
+    </record>
 
     <!-- <record id="action_open_odory_client_search_wizard" model="ir.actions.act_window"> -->
     <!--     <field name="name">Odory Client Search Wizard</field> -->
@@ -21,8 +31,41 @@
     <!-- </record> -->
 
     
-    <!-- <menuitem id="menu_odory_client_app" name="Odory Client" action="action_open_odory_client_wizard" sequence="20" active="1"/> -->
+    <!-- <menuitem id="menu_client" name="Odory Client" action="action_open_client_wizard" sequence="20" active="1"/> -->
     <!-- <menuitem id="menu_odory_client_app_search" name="Odory Client Search" action="action_open_odory_client_search_wizard" sequence="21" active="1"/> -->
+
+    <!-- <record id="action_o_dory_account_tree_view" model="ir.actions.act_window"> -->
+    <!--   <field name="name">Tree View</field> -->
+    <!--   <field name="res_model">o.dory.account</field> -->
+    <!--   <field name="view_type">form</field> -->
+    <!--   <field name="view_mode">tree,form</field> -->
+    <!-- </record> -->
+
+    <record id="view_o_dory_account" model="ir.ui.view">
+      <field name="name">o.dory.account.view</field>
+      <field name="model">o.dory.account</field>
+      <field name="arch" type="xml">
+	<form>
+	  <header>
+	    <button string="Test Connection" type="object" name="verify_connection" class="btn-primary"/>
+	    <button string="Upload a File" type="action" name="%(action_client_upload_wizard)d" class="btn-primary"/>
+	    <button string="Remove a File" type="action" name="%(action_client_remove_wizard)d" class="btn-primary"/>
+	  </header>
+	  <sheet>		    
+	    <group>
+	      <group>
+		<field name="name"/>
+		<field name="oid"/>
+		<field name="account"/>
+		<field name="password" password="True"/>
+		<field name="url"/>
+		<field name="db"/>
+	      </group>
+	    </group>
+	  </sheet>
+	</form>
+      </field>
+    </record>
 
 
     <record id="action_client" model="ir.actions.act_window">

@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 # Copyright (c) 2021, Emmie He <heemmie@gmail.com>
 {
-    "name": "ODORY",
-    "summary": "ODORY is a DORY-style end-to-end encrypted file-storing application.",
+    "name": "O-DORY Client",
+    "summary": "O-DORY is a DORY-style end-to-end encrypted file-storing application. This module contains functionalities of an O-DORY client.",
     "license": "LGPL-3",
     "description": """
 Reproducing Keyword Search and Document Retrieval in Encrypted File-storing Systems.

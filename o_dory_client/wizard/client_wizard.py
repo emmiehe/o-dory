@@ -23,13 +23,47 @@ class ClientWizard(models.TransientModel):
     raw_file = fields.Binary(string="Your File")
 
     search_term = fields.Char("Search a Keyword")
+    search_result = fields.Text("Search Result")
+    
+    def action_do_upload(self):
+        self.ensure_one()
+        if self.raw_file is not None:
+            self.account_id.upload(self.raw_file)
+        return {"type": "ir.actions.act_window_close"}
 
-    # todo: in the future this extracts the unique words from the file
-    def get_unique_keywords(self, f):
-        return self.keywords.split(" ")
+    def action_do_remove(self):
+        self.ensure_one()
+        if self.document_id is not None:
+            self.account_id.remove(self.document_id)
+        return {"type": "ir.actions.act_window_close"}
 
+    def action_do_update(self):
+        self.ensure_one()
+        if self.document_id is not None and self.raw_file is not None:
+            self.account_id.update(self.document_id, self.raw_file)
+        return {"type": "ir.actions.act_window_close"}
+    
     def action_do_search(self):
         self.ensure_one()
+        if self.search_term:
+            res = self.account_id.search_keyword(self.search_term)
+            # give a list of document ids that contains that keyword
+            self.search_result = "search functionality not in place: {}".format(res)
+            action_window = {
+                "type": "ir.actions.act_window",
+                "res_model": "client.wizard",
+                "name": "Search Result",
+                # "views": [[False, "form"]],
+                "context": {"create": False},
+                "res_id": self.id,
+                "view_mode": "form",
+                "view_id": self.env.ref("o_dory_client.wizard_client_search_result").id,
+                "target": "new",
+            }
+            return action_window
+        return {"type": "ir.actions.act_window_close"}
+        # return {"type": "ir.actions.act_window_close"}
+            
         # if self.search_term:
         #     # before we do any search, we should ask the server master
         #     # (if there is one), do my partitions have the same versions bitmaps
@@ -52,16 +86,4 @@ class ClientWizard(models.TransientModel):
         #         print("-------------->k, v", k, v)
         #         client.search_result += "{}: {}\n".format(k, v)
 
-        return {"type": "ir.actions.act_window_close"}
-
-    def action_do_upload(self):
-        self.ensure_one()
-        if self.raw_file is not None:
-            self.account_id.upload(self.raw_file)
-        return {"type": "ir.actions.act_window_close"}
-
-    def action_do_remove(self):
-        self.ensure_one()
-        if self.document_id is not None:
-            self.account_id.remove(self.document_id)
         return {"type": "ir.actions.act_window_close"}

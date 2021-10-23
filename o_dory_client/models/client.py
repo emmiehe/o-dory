@@ -114,3 +114,15 @@ class ODoryAccount(models.Model):
     def update(self, fid, new_raw_file):
         self.remove(fid)
         self.upload(new_raw_file)
+        # this is not the most performance friendly
+
+
+    # prepare dpf secrets here and send to each partitions
+    # should not send all secrets to central server/master
+    def search_keyword(self, keyword):
+        uid, models = self.connect()
+        if not uid:
+            raise ValidationError(_("Connection Failed."))
+
+        res = []
+        return res

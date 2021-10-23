@@ -28,6 +28,7 @@ class ServerFolder(models.Model):
     user_id = fields.Many2one(
         "res.users", ondelete="cascade", string="User", required=1
     )
+    partition_ids = fields.One2many("server.folder.partition", "folder_id", string="Partitions", readonly=True)
 
     @api.model_create_multi
     def create(self, vals_list):

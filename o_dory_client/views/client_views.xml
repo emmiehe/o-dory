@@ -10,7 +10,6 @@
         <field name="view_id" ref="wizard_client_upload" />
         <field name="target">new</field>
     </record>
-
     
     <record id="action_client_remove_wizard" model="ir.actions.act_window">
         <field name="name">Client Wizard</field>
@@ -21,14 +20,23 @@
         <field name="target">new</field>
     </record>
 
-    <!-- <record id="action_open_odory_client_search_wizard" model="ir.actions.act_window"> -->
-    <!--     <field name="name">Odory Client Search Wizard</field> -->
-    <!--     <field name="type">ir.actions.act_window</field> -->
-    <!--     <field name="res_model">odory.client.wizard</field> -->
-    <!--     <field name="view_mode">form</field> -->
-    <!--     <field name="view_id" ref="wizard_odory_client_search" /> -->
-    <!--     <field name="target">new</field> -->
-    <!-- </record> -->
+    <record id="action_client_update_wizard" model="ir.actions.act_window">
+        <field name="name">Client Wizard</field>
+        <field name="type">ir.actions.act_window</field>
+        <field name="res_model">client.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="view_id" ref="wizard_client_update" />
+        <field name="target">new</field>
+    </record>
+
+    <record id="action_client_search_wizard" model="ir.actions.act_window">
+        <field name="name">Client Wizard</field>
+        <field name="type">ir.actions.act_window</field>
+        <field name="res_model">client.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="view_id" ref="wizard_client_search" />
+        <field name="target">new</field>
+    </record>
 
     
     <!-- <menuitem id="menu_client" name="Odory Client" action="action_open_client_wizard" sequence="20" active="1"/> -->
@@ -50,6 +58,8 @@
 	    <button string="Test Connection" type="object" name="verify_connection" class="btn-primary"/>
 	    <button string="Upload a File" type="action" name="%(action_client_upload_wizard)d" class="btn-primary"/>
 	    <button string="Remove a File" type="action" name="%(action_client_remove_wizard)d" class="btn-primary"/>
+	    <button string="Update a File" type="action" name="%(action_client_update_wizard)d" class="btn-primary"/>
+	    <button string="Search Keyword" type="action" name="%(action_client_search_wizard)d" class="btn-primary"/>
 	  </header>
 	  <sheet>		    
 	    <group>

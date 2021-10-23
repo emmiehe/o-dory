@@ -7,7 +7,7 @@
             <field name="priority">16</field>
             <field name="type">form</field>
             <field name="arch" type="xml">
-                <form string="O-DORY Client">
+                <form string="O-DORY Client Upload">
                   <sheet>
                     <group>
 		      <field name="account_id" readonly="1"/>
@@ -28,7 +28,7 @@
             <field name="priority">16</field>
             <field name="type">form</field>
             <field name="arch" type="xml">
-                <form string="O-DORY Client">
+                <form string="O-DORY Client Remove">
                   <sheet>
                     <group>
 		      <field name="account_id" readonly="1"/>
@@ -43,24 +43,70 @@
             </field>
         </record>
 
-        <!-- <record model="ir.ui.view" id="wizard_odory_client_search"> -->
-        <!--     <field name="name">Odory Client Wizard</field> -->
-        <!--     <field name="model">odory.client.wizard</field> -->
-        <!--     <field name="priority">16</field> -->
-        <!--     <field name="type">form</field> -->
-        <!--     <field name="arch" type="xml"> -->
-        <!--         <form string="Odory Client Search"> -->
-        <!--           <sheet> -->
-        <!--               <group> -->
-	<!-- 		<field name="search_term"/> -->
-        <!--                 </group> -->
-        <!--             </sheet> -->
-        <!--             <footer> -->
-        <!--                 <button string="Confirm" type="object" name="action_do_search" class="oe_highlight"/> -->
-        <!--                 <button string="Cancel" special="cancel" class="oe_link"/> -->
-        <!--             </footer> -->
-        <!--         </form> -->
-        <!--     </field> -->
-        <!-- </record> -->
+	<record model="ir.ui.view" id="wizard_client_update">
+	  <field name="name">Update</field>
+            <field name="model">client.wizard</field>
+            <field name="priority">16</field>
+            <field name="type">form</field>
+            <field name="arch" type="xml">
+                <form string="O-DORY Client Update">
+                  <sheet>
+                    <group>
+		      <field name="account_id" readonly="1"/>
+		      <field name="document_id"/>
+		      <field name="raw_file"/>
+                    </group>
+                  </sheet>
+                  <footer>
+                    <button string="Confirm" type="object" name="action_do_update" class="oe_highlight"/>
+                    <button string="Cancel" special="cancel" class="oe_link"/>
+                  </footer>
+                </form>
+            </field>
+        </record>
+
+	<record model="ir.ui.view" id="wizard_client_search">
+	  <field name="name">Search</field>
+            <field name="model">client.wizard</field>
+            <field name="priority">16</field>
+            <field name="type">form</field>
+            <field name="arch" type="xml">
+                <form string="O-DORY Client Search">
+                  <sheet>
+                    <group>
+		      <field name="account_id" readonly="1"/>
+		      <field name="search_term"/>
+                    </group>
+                  </sheet>
+                  <footer>
+                    <button string="Confirm" type="object" name="action_do_search" class="oe_highlight"/>
+                    <button string="Cancel" special="cancel" class="oe_link"/>
+                  </footer>
+                </form>
+            </field>
+        </record>
+
+	<record model="ir.ui.view" id="wizard_client_search_result">
+	  <field name="name">Search Result</field>
+            <field name="model">client.wizard</field>
+            <field name="priority">16</field>
+            <field name="type">form</field>
+            <field name="arch" type="xml">
+                <form string="O-DORY Client Search">
+                  <sheet>
+                    <group>
+		      <field name="account_id" readonly="1"/>
+		      <field name="search_term" string="Keyword" readonly="1"/>
+		      <field name="search_result" readonly="1"/>
+                    </group>
+                  </sheet>
+                  <footer>
+                    <!-- <button string="Confirm" type="object" name="action_do_search" class="oe_highlight"/> -->
+                    <button string="Close" special="cancel" class="oe_link"/>
+                  </footer>
+                </form>
+            </field>
+        </record>
+
     </data>
 </odoo>

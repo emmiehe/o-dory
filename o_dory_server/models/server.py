@@ -28,7 +28,9 @@ class ServerFolder(models.Model):
     user_id = fields.Many2one(
         "res.users", ondelete="cascade", string="User", required=1
     )
-    partition_ids = fields.One2many("server.folder.partition", "folder_id", string="Partitions", readonly=True)
+    partition_ids = fields.One2many(
+        "server.folder.partition", "folder_id", string="Partitions", readonly=True
+    )
 
     @api.model_create_multi
     def create(self, vals_list):
@@ -100,7 +102,7 @@ class ServerFolderPartition(models.Model):
     # doc_id: [0, 1, 1, ...]
     # doc_id: [1, 1, 0, ...]
     # now we want to get each column,
-    # should give a 2d array and a map of row_index to doc_id 
+    # should give a 2d array and a map of row_index to doc_id
     def bitmaps_flip(self, bitmaps_obj):
         self.ensure_one()
         items = bitmaps_obj.items()
@@ -124,7 +126,7 @@ class ServerFolderPartition(models.Model):
             del bitmaps_obj[doc_id]
             return True
         return False
-    
+
     @api.depends("bitmaps")
     def _compute_bitmaps_str(self):
         for pid in self:

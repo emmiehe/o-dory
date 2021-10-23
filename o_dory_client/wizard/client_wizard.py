@@ -24,7 +24,7 @@ class ClientWizard(models.TransientModel):
 
     search_term = fields.Char("Search a Keyword")
     search_result = fields.Text("Search Result")
-    
+
     def action_do_upload(self):
         self.ensure_one()
         if self.raw_file is not None:
@@ -42,7 +42,7 @@ class ClientWizard(models.TransientModel):
         if self.document_id is not None and self.raw_file is not None:
             self.account_id.update(self.document_id, self.raw_file)
         return {"type": "ir.actions.act_window_close"}
-    
+
     def action_do_search(self):
         self.ensure_one()
         if self.search_term:
@@ -63,7 +63,7 @@ class ClientWizard(models.TransientModel):
             return action_window
         return {"type": "ir.actions.act_window_close"}
         # return {"type": "ir.actions.act_window_close"}
-            
+
         # if self.search_term:
         #     # before we do any search, we should ask the server master
         #     # (if there is one), do my partitions have the same versions bitmaps

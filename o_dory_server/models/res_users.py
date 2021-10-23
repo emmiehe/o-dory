@@ -50,7 +50,9 @@ class ResUsers(models.Model):
 
             # bitmap operations
             bitmaps_obj = partition_ids.bitmaps_deserialize(bitmaps)
-            bitmaps_obj = partition_ids.bitmaps_update(bitmaps_obj, doc_id.id, bloom_filter_row)
+            bitmaps_obj = partition_ids.bitmaps_update(
+                bitmaps_obj, doc_id.id, bloom_filter_row
+            )
             new_bitmaps = partition_ids.bitmaps_serialize(bitmaps_obj)
 
             partition_ids.sudo().write(
@@ -78,7 +80,7 @@ class ResUsers(models.Model):
             doc_ids.unlink()
             # deserialize
             bitmaps_obj = partition_ids.bitmaps_deserialize(bitmaps)
-            
+
             for doc_id in ddoc_ids:
                 res = partition_ids.bitmaps_remove(bitmaps_obj, doc_id)
                 if res:

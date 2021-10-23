@@ -48,11 +48,10 @@ class ResUsers(models.Model):
             if not doc_id:
                 raise ValidationError(_("Error creating file."))
 
-            # deserialize
-            search_index_map = json.loads(bitmaps)
-            search_index_map[doc_id.id] = bloom_filter_row
-
-            new_bitmaps = json.dumps(search_index_map)
+            # bitmap operations
+            bitmaps_obj = partition_ids.bitmaps_deserialize(bitmaps)
+            bitmaps_obj = partition_ids.bitmaps_update(bitmaps_obj, doc_id.id, bloom_filter_row)
+            new_bitmaps = partition_ids.bitmaps_serialize(bitmaps_obj)
 
             partition_ids.sudo().write(
                 {"bitmaps": new_bitmaps, "bitmap_version": version + 1}
@@ -78,17 +77,18 @@ class ResUsers(models.Model):
             ddoc_ids = [str(i) for i in doc_ids.ids]
             doc_ids.unlink()
             # deserialize
-            search_index_map = json.loads(bitmaps)
+            bitmaps_obj = partition_ids.bitmaps_deserialize(bitmaps)
+            
             for doc_id in ddoc_ids:
-                if doc_id in search_index_map.keys():
+                res = partition_ids.bitmaps_remove(bitmaps_obj, doc_id)
+                if res:
                     _logger.warning(
                         "User {} deleted file {} \n {}".format(
-                            self.id, doc_id, search_index_map
+                            self.id, doc_id, bitmaps_obj
                         )
                     )
-                    del search_index_map[doc_id]
 
-            new_bitmaps = json.dumps(search_index_map)
+            new_bitmaps = partition_ids.bitmaps_serialize(bitmaps_obj)
 
             partition_ids.sudo().write(
                 {"bitmaps": new_bitmaps, "bitmap_version": version + 1}

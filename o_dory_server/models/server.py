@@ -48,7 +48,7 @@ class ServerFolder(models.Model):
             for db_id in db_ids:
                 partition_data.append(
                     {
-                        "name": res_id.name,
+                        "name": "{}({})".format(res_id.name, db_id.name),
                         "folder_id": res_id.id,
                         "database_id": db_id.id,
                     }
@@ -67,7 +67,7 @@ class ServerFolderPartition(models.Model):
 
     name = fields.Char("Name")
     folder_id = fields.Many2one(
-        "server.folder", ondelete="restrict", string="Folder", required=1
+        "server.folder", ondelete="cascade", string="Folder", required=1
     )
     database_id = fields.Many2one(
         "server.database", ondelete="restrict", string="Database", required=1
@@ -75,35 +75,71 @@ class ServerFolderPartition(models.Model):
     user_id = fields.Many2one(related="folder_id.user_id")
 
     bitmap_version = fields.Integer("Bitmap Version")
-    bitmap_width = fields.Integer("Bitmap Width", default=1000, readonly=1)
+    bitmap_width = fields.Integer("Bitmap Width", default=7)
     bitmaps = fields.Binary("Bitmaps", attachment=False)
     # a field for display only
     bitmaps_str = fields.Char(
         "Bitmaps String", compute="_compute_bitmaps_str", store=True
     )  # this field should be removed later
 
-    def _retrieve_column(self, encrypted_keyword, salt=None):
-        for sdb in self:
-            bitmaps = json.loads(sdb.bitmaps)
-            index = encrypted_keyword % sdb.bitmap_width
-            print("===== retrieve index is ", index)
-            return json.dumps([[k, v[index]] for [k, v] in bitmaps.items()])
+    # we need some bitmaps operations
+    # for now the bitmaps is a dictionary,
+    # key is the str(id) of the encrypted document
+    # value is a list of 0s and 1s, each index indicates a keyword
+    def bitmaps_create(self):
+        return dict()
 
+    def bitmaps_serialize(self, bitmaps_obj):
+        return json.dumps(bitmaps_obj)
+
+    def bitmaps_deserialize(self, bitmaps_serialized):
+        return json.loads(bitmaps_serialized)
+
+    # usually our bitmaps looks like this
+    # doc_id: [0, 1, 0, ...]
+    # doc_id: [0, 1, 1, ...]
+    # doc_id: [1, 1, 0, ...]
+    # now we want to get each column,
+    # should give a 2d array and a map of row_index to doc_id 
+    def bitmaps_flip(self, bitmaps_obj):
+        self.ensure_one()
+        items = bitmaps_obj.items()
+        cols = [[0] * len(items)] * self.bitmap_width
+        row_to_doc = dict()
+        for i in range(len(items)):
+            doc_id, row = items[i]
+            row_to_doc[i] = doc_id
+            for j in range(len(row)):
+                cols[j][i] = row[j]
+        return cols, row_to_doc
+
+    def bitmaps_update(self, bitmaps_obj, doc_id, row):
+        doc_id = str(doc_id)
+        bitmaps_obj[doc_id] = row
+        return bitmaps_obj
+
+    def bitmaps_remove(self, bitmaps_obj, doc_id):
+        doc_id = str(doc_id)
+        if doc_id in bitmaps_obj.keys():
+            del bitmaps_obj[doc_id]
+            return True
+        return False
+    
     @api.depends("bitmaps")
     def _compute_bitmaps_str(self):
-        for sdb in self:
-            dic = json.loads(sdb.bitmaps)
+        for pid in self:
+            dic = pid.bitmaps_deserialize(pid.bitmaps)
             string = ""
             for k, v in dic.items():
                 string += "{}: {}\n".format(k, v)
-            sdb.bitmaps_str = string
+            pid.bitmaps_str = string
 
     @api.model_create_multi
     def create(self, vals_list):
         res_ids = super(ServerFolderPartition, self).create(vals_list)
         # when a server database is created, there should be a bitmap table setup
         for res_id in res_ids:
-            res_id.bitmaps = json.dumps(dict())
+            res_id.bitmaps = res_id.bitmaps_serialize(res_id.bitmaps_create())
         return res_ids
 
 

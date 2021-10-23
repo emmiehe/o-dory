@@ -86,7 +86,7 @@ class ODoryAccount(models.Model):
         encrypted_file = self.encrypt(raw_file)
 
         # todo catch exception
-        models.execute_kw(
+        res = models.execute_kw(
             self.db,
             uid,
             self.password,
@@ -94,6 +94,7 @@ class ODoryAccount(models.Model):
             "upload_encrypted_file",
             [[uid], encrypted_file, row],
         )
+        return res
 
     # given a document id, we should remove the file from the server
     # the corresponding bitmaps row also need to be removed
@@ -101,7 +102,7 @@ class ODoryAccount(models.Model):
         uid, models = self.connect()
         if not uid:
             raise ValidationError(_("Connection Failed."))
-        models.execute_kw(
+        res = models.execute_kw(
             self.db,
             uid,
             self.password,
@@ -109,13 +110,14 @@ class ODoryAccount(models.Model):
             "remove_encrypted_file_by_ids",
             [[uid], [fid]],
         )
+        return res
 
     # updating old file with the new raw file
     def update(self, fid, new_raw_file):
-        self.remove(fid)
-        self.upload(new_raw_file)
+        res = self.remove(fid)
+        if res == True:
+            res = self.upload(new_raw_file)
         # this is not the most performance friendly
-
 
     # prepare dpf secrets here and send to each partitions
     # should not send all secrets to central server/master

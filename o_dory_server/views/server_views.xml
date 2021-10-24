@@ -82,9 +82,18 @@
       <field name="view_mode">tree,form</field>
       <field name="context">{}</field>
     </record>
-   
-    <menuitem id="menu_server_folder" name="Folder" action="action_server_folder" sequence="1" active="1"/>
-    <menuitem id="menu_encrypted_documents" name="Encrypted Documents" action="action_encrypted_document" sequence="2" active="1"/>
+
+    <record id="action_server_database" model="ir.actions.act_window">
+      <field name="name">Server Database</field>
+      <field name="res_model">server.database</field>
+      <field name="view_mode">tree,form</field>
+      <field name="context">{}</field>
+    </record>
+
+    <menuitem id="menu_server_database" name="Server Database" action="action_server_database" sequence="1" active="1">
+      <menuitem id="menu_server_folder" name="User Folders" action="action_server_folder" sequence="2" active="1"/>
+      <menuitem id="menu_encrypted_documents" name="Encrypted Documents" action="action_encrypted_document" sequence="3" active="1"/>
+    </menuitem>
     
 
   </data>

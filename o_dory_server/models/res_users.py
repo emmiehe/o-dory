@@ -97,3 +97,30 @@ class ResUsers(models.Model):
             )
 
         return True
+
+    def update_file_by_id(self, fid, encrypted_document, bloom_filter_row):
+        for user_id in self:
+            version, bitmaps, partition_ids = user_id.get_verified_partitions()
+
+            # verify the old file exists
+            doc_ids = user_id.env["encrypted.document"].search(
+                [("user_id", "=", user_id.id), ("id", "=", fid)]
+            )
+            if not doc_ids:
+                raise ValidationError(_("Error creating file."))
+
+            doc_id = doc_ids[0]
+            doc_id.write({"blob": encrypted_document})
+
+            # bitmap operations
+            bitmaps_obj = partition_ids.bitmaps_deserialize(bitmaps)
+            bitmaps_obj = partition_ids.bitmaps_update(
+                bitmaps_obj, doc_id.id, bloom_filter_row
+            )
+            new_bitmaps = partition_ids.bitmaps_serialize(bitmaps_obj)
+
+            partition_ids.sudo().write(
+                {"bitmaps": new_bitmaps, "bitmap_version": version + 1}
+            )
+
+        return True

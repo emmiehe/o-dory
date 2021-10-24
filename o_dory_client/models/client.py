@@ -30,6 +30,7 @@ class ODoryAccount(models.Model):
 
     # misc for client
     def connect(self):
+        self.ensure_one()
         # Logging in
         common = client.ServerProxy("{}/xmlrpc/2/common".format(self.url))
         # print(common.version())
@@ -56,9 +57,11 @@ class ODoryAccount(models.Model):
 
     # todo: implement this seriously
     def compute_word_index(self, word):
+        self.ensure_one()
         return hash(word) % self.bloom_filter_k
 
     def make_bloom_filter_row(self, keywords):
+        self.ensure_one()
         res = [0] * self.bloom_filter_k
         for keyword in keywords:
             i = self.compute_word_index(keyword)
@@ -114,10 +117,23 @@ class ODoryAccount(models.Model):
 
     # updating old file with the new raw file
     def update(self, fid, new_raw_file):
-        res = self.remove(fid)
-        if res == True:
-            res = self.upload(new_raw_file)
-        # this is not the most performance friendly
+        uid, models = self.connect()
+        if not uid:
+            raise ValidationError(_("Connection Failed."))
+
+        keywords = self.extract_keywords(new_raw_file)
+        row = self.make_bloom_filter_row(keywords)
+        encrypted_file = self.encrypt(new_raw_file)
+
+        res = models.execute_kw(
+            self.db,
+            uid,
+            self.password,
+            "res.users",
+            "update_file_by_id",
+            [[uid], fid, encrypted_file, row],
+        )
+        return res
 
     # prepare dpf secrets here and send to each partitions
     # should not send all secrets to central server/master

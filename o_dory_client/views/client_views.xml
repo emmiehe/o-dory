@@ -56,22 +56,37 @@
 	<form>
 	  <header>
 	    <button string="Test Connection" type="object" name="verify_connection" class="btn-primary"/>
-	    <button string="Upload a File" type="action" name="%(action_client_upload_wizard)d" class="btn-primary"/>
-	    <button string="Remove a File" type="action" name="%(action_client_remove_wizard)d" class="btn-primary"/>
-	    <button string="Update a File" type="action" name="%(action_client_update_wizard)d" class="btn-primary"/>
-	    <button string="Search Keyword" type="action" name="%(action_client_search_wizard)d" class="btn-primary"/>
+	    <button string="Retrieve Document IDs from Server" type="object" name="retrieve_ids" class="btn-primary"/>
+	    <button string="Upload Files" type="action" name="%(action_client_upload_wizard)d" class="btn-primary"/>
+	    <button string="Remove Files" type="action" name="%(action_client_remove_wizard)d" class="btn-primary"/>
+	    <button string="Update Files" type="action" name="%(action_client_update_wizard)d" class="btn-primary"/>
+	    <button string="Search Keywords" type="action" name="%(action_client_search_wizard)d" class="btn-primary"/>
 	  </header>
 	  <sheet>		    
-	    <group>
-	      <group>
-		<field name="name"/>
-		<field name="oid"/>
-		<field name="account"/>
-		<field name="password" password="True"/>
-		<field name="url"/>
-		<field name="db"/>
-	      </group>
-	    </group>
+	    <notebook>
+              <page name="document_records" string="Document Records">
+                <group>
+                  <field name="document_ids" widget="one2many" nolabel="1" context="{'default_account_id': active_id}">
+                    <tree name="tree_document_record" string="Document Records" editable="bottom">
+                      <field name="doc_id"/>
+                      <field name="name"/>
+                    </tree>              
+                  </field>
+                </group>
+              </page>
+	      <page name="account_info" string="Account Info">
+		<group>
+		  <group>
+		    <field name="name"/>
+		    <field name="oid"/>
+		    <field name="account"/>
+		    <field name="password" password="True"/>
+		    <field name="url"/>
+		    <field name="db"/>
+		  </group>
+		</group>
+	      </page>
+	    </notebook>
 	  </sheet>
 	</form>
       </field>
@@ -85,7 +100,7 @@
       <field name="context">{}</field>
     </record>
    
-    <menuitem id="menu_o_dory_account" name="O-DORY Account" action="action_client" sequence="7" active="1"/>
+    <menuitem id="menu_o_dory_account" name="O-DORY Accounts" action="action_client" sequence="7" active="1"/>
 
     
   </data>

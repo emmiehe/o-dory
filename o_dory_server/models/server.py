@@ -115,17 +115,20 @@ class ServerFolderPartition(models.Model):
                 cols[j][i] = row[j]
         return cols, row_to_doc
 
-    def bitmaps_update(self, bitmaps_obj, doc_id, row):
-        doc_id = str(doc_id)
-        bitmaps_obj[doc_id] = row
+    def bitmaps_update(self, bitmaps_obj, doc_ids, rows):
+        for i in range(len(doc_ids)):
+            doc_id = str(doc_ids[i])
+            bitmaps_obj[doc_id] = rows[i]
         return bitmaps_obj
 
-    def bitmaps_remove(self, bitmaps_obj, doc_id):
-        doc_id = str(doc_id)
-        if doc_id in bitmaps_obj.keys():
-            del bitmaps_obj[doc_id]
-            return True
-        return False
+    def bitmaps_remove(self, bitmaps_obj, doc_ids):
+        count, removed = len(doc_ids), 0
+        for doc_id in doc_ids:
+            doc_id = str(doc_id)
+            if doc_id in bitmaps_obj.keys():
+                del bitmaps_obj[doc_id]
+                removed += 1
+        return count == removed
 
     @api.depends("bitmaps")
     def _compute_bitmaps_str(self):

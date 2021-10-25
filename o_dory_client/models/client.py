@@ -28,6 +28,13 @@ class ODoryAccount(models.Model):
     )
     bloom_filter_k = fields.Integer("Bitmap Width", default=7)
 
+    document_ids = fields.One2many(
+        "document.record",
+        "account_id",
+        "Document Records",
+        help="Records for documents that are uploaded/updated from this client.",
+    )
+
     # misc for client
     def connect(self):
         self.ensure_one()
@@ -72,67 +79,153 @@ class ODoryAccount(models.Model):
     def encrypt(self, raw):
         return raw
 
+    def decrypt(self, encrypted):
+        return encrypted
+
     # let the account object handle uploading, removing,
     # and updating (removing and uploading)
 
-    # given a raw file, we should upload to a partition
+    # given raw files, we should upload to a partition
     # (randomly for now as it is out of the scope)
     # we also should add a row to every partition's bitmaps
     # (or we can tell the master and let the master to do it)
-    def upload(self, raw_file):
+    def upload(self, raw_data):
         uid, models = self.connect()
         if not uid:
             raise ValidationError(_("Connection Failed."))
 
-        keywords = self.extract_keywords(raw_file)
-        row = self.make_bloom_filter_row(keywords)
-        encrypted_file = self.encrypt(raw_file)
+        files, rows, filenames = [], [], []
+        for rf, filename in raw_data:
+            keyword = self.extract_keywords(rf)
+            row = self.make_bloom_filter_row(keyword)
+            encrypted_file = self.encrypt(rf)
+            files.append(encrypted_file)
+            rows.append(row)
+            filenames.append(filename)
+
+        if not files:
+            return []
+
+        data = [files, rows]
 
         # todo catch exception
-        res = models.execute_kw(
+        res_ids = models.execute_kw(
             self.db,
             uid,
             self.password,
             "res.users",
-            "upload_encrypted_file",
-            [[uid], encrypted_file, row],
+            "upload_encrypted_files",
+            [[uid], data],
         )
-        return res
 
-    # given a document id, we should remove the file from the server
+        if res_ids != None:
+            self.env["document.record"].create(
+                [
+                    {
+                        "account_id": self.id,
+                        "doc_id": res_ids[i],
+                        "name": filenames[i],
+                    }
+                    for i in range(len(res_ids))
+                ]
+            )
+
+        return res_ids
+
+    # given document ids, we should remove the file from the server
     # the corresponding bitmaps row also need to be removed
-    def remove(self, fid):
+    def remove(self, fids):
         uid, models = self.connect()
         if not uid:
             raise ValidationError(_("Connection Failed."))
-        res = models.execute_kw(
-            self.db,
-            uid,
-            self.password,
-            "res.users",
-            "remove_encrypted_file_by_ids",
-            [[uid], [fid]],
-        )
-        return res
+        if fids:
+            res = models.execute_kw(
+                self.db,
+                uid,
+                self.password,
+                "res.users",
+                "remove_encrypted_files_by_ids",
+                [[uid], fids],
+            )
+
+            if res:
+                rec_ids = self.env["document.record"].search(
+                    [("account_id", "=", self.id), ("doc_id", "in", fids)]
+                )
+                rec_ids.unlink()
+            return res
+
+        return False
 
     # updating old file with the new raw file
-    def update(self, fid, new_raw_file):
+    def update(self, fids, new_raw_files):
         uid, models = self.connect()
         if not uid:
             raise ValidationError(_("Connection Failed."))
 
-        keywords = self.extract_keywords(new_raw_file)
-        row = self.make_bloom_filter_row(keywords)
-        encrypted_file = self.encrypt(new_raw_file)
+        encrypted_files, rows = [], []
+        for new_raw_file in new_raw_files:
+            keywords = self.extract_keywords(new_raw_file)
+            row = self.make_bloom_filter_row(keywords)
+            encrypted_file = self.encrypt(new_raw_file)
+            encrypted_files.append(encrypted_file)
+            rows.append(row)
 
         res = models.execute_kw(
             self.db,
             uid,
             self.password,
             "res.users",
-            "update_file_by_id",
-            [[uid], fid, encrypted_file, row],
+            "update_files_by_ids",
+            [[uid], [fids, encrypted_files, rows]],
         )
+        return res
+
+    def retrieve_ids(self):
+        uid, models = self.connect()
+        if not uid:
+            raise ValidationError(_("Connection Failed."))
+
+        ids = models.execute_kw(
+            self.db,
+            uid,
+            self.password,
+            "res.users",
+            "retrieve_doc_ids",
+            [[uid]],
+        )
+
+        if ids:
+            oids = self.env["document.record"].search_read(
+                [("account_id", "=", self.id)], fields=["doc_id"]
+            )
+            oids = [o.get("doc_id") for o in oids]
+            nids = [i for i in ids if i not in oids]
+            self.env["document.record"].create(
+                [{"doc_id": i, "account_id": self.id, "name": "Unnamed"} for i in nids]
+            )
+
+        return ids
+
+    # retrive documents by ids
+    def retrieve_files(self, fids):  # a list of fid
+        uid, models = self.connect()
+        if not uid:
+            raise ValidationError(_("Connection Failed."))
+
+        encrypted_documents = models.execute_kw(
+            self.db,
+            uid,
+            self.password,
+            "res.users",
+            "retrieve_encrypted_files_by_ids",
+            [[uid], fids],
+        )
+
+        res = [self.decrypt(e) for e in encrypted_documents]
+
+        # todo
+        # should do the auto download thing
         return res
 
     # prepare dpf secrets here and send to each partitions
@@ -144,3 +237,23 @@ class ODoryAccount(models.Model):
 
         res = []
         return res
+
+
+class DocumentRecord(models.Model):
+    _name = "document.record"
+    _description = "Document Record"
+
+    # allow a name field for the customer to map
+    name = fields.Char("File Name")
+    doc_id = fields.Integer("Document ID", required=True)
+    account_id = fields.Many2one(
+        "o.dory.account",
+        ondelete="restrict",
+        string="O-DORY Account",
+        required=True,
+        readonly=True,
+    )
+
+    # should removing a document here
+    # remove the document stored on the server?
+    # maybe that should be a separate action

@@ -11,8 +11,14 @@
                   <sheet>
                     <group>
 		      <field name="account_id" readonly="1"/>
-		      <field name="raw_file"/>
-                    </group>
+		    </group>
+		    <field name="data_ids" widget="one2many" nolabel="1" context="{'default_wizard_id': active_id}">
+		      <tree name="tree_data_upload" string="Upload Data" editable="bottom">
+			<field name="raw_file"/>
+			<field name="filename"/>
+		      </tree>              
+                    </field>
+                    
                   </sheet>
                   <footer>
                     <button string="Confirm" type="object" name="action_do_upload" class="oe_highlight"/>
@@ -32,8 +38,12 @@
                   <sheet>
                     <group>
 		      <field name="account_id" readonly="1"/>
-		      <field name="document_id"/>
-                    </group>
+		    </group>
+		    <field name="data_ids" widget="one2many" nolabel="1" context="{'default_wizard_id': active_id}">
+		      <tree name="tree_data_remove" string="Remove by IDs" editable="bottom">
+			<field name="document_id"/>
+		      </tree>              
+                    </field>		      
                   </sheet>
                   <footer>
                     <button string="Confirm" type="object" name="action_do_remove" class="oe_highlight"/>
@@ -53,9 +63,13 @@
                   <sheet>
                     <group>
 		      <field name="account_id" readonly="1"/>
-		      <field name="document_id"/>
-		      <field name="raw_file"/>
-                    </group>
+		    </group>
+		    <field name="data_ids" widget="one2many" nolabel="1" context="{'default_wizard_id': active_id}">
+		      <tree name="tree_data_update" string="Update Files" editable="bottom">
+			<field name="document_id"/>
+			<field name="raw_file" string="New File"/>
+		      </tree>              
+                    </field>		      
                   </sheet>
                   <footer>
                     <button string="Confirm" type="object" name="action_do_update" class="oe_highlight"/>
@@ -75,8 +89,12 @@
                   <sheet>
                     <group>
 		      <field name="account_id" readonly="1"/>
-		      <field name="search_term"/>
                     </group>
+		    <field name="data_ids" widget="one2many" nolabel="1" context="{'default_wizard_id': active_id}">
+		      <tree name="tree_data_search" string="Search by Keywords" editable="bottom">
+			<field name="search_term"/>
+		      </tree>              
+                    </field>		      
                   </sheet>
                   <footer>
                     <button string="Confirm" type="object" name="action_do_search" class="oe_highlight"/>
@@ -96,9 +114,13 @@
                   <sheet>
                     <group>
 		      <field name="account_id" readonly="1"/>
-		      <field name="search_term" string="Keyword" readonly="1"/>
-		      <field name="search_result" readonly="1"/>
                     </group>
+		    <field name="data_ids" widget="one2many" nolabel="1" context="{'default_wizard_id': active_id}" readonly="1">
+		      <tree name="tree_data_search_results" string="Search Results" editable="false" delete="false">
+			<field name="search_term" string="Keyword" readonly="1"/>
+			<field name="search_result" readonly="1"/>
+		      </tree>              
+                    </field>		      
                   </sheet>
                   <footer>
                     <!-- <button string="Confirm" type="object" name="action_do_search" class="oe_highlight"/> -->

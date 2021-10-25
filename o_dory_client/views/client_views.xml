@@ -55,8 +55,8 @@
       <field name="arch" type="xml">
 	<form>
 	  <header>
-	    <button string="Test Connection" type="object" name="verify_connection" class="btn-primary"/>
-	    <button string="Retrieve Document IDs from Server" type="object" name="retrieve_ids" class="btn-primary"/>
+	    <button string="Test Connection" type="object" name="verify_connection" class="btn-secondary"/>
+	    <button string="Retrieve Document IDs from Server" type="object" name="retrieve_ids" class="btn-secondary"/>
 	    <button string="Upload Files" type="action" name="%(action_client_upload_wizard)d" class="btn-primary"/>
 	    <button string="Remove Files" type="action" name="%(action_client_remove_wizard)d" class="btn-primary"/>
 	    <button string="Update Files" type="action" name="%(action_client_update_wizard)d" class="btn-primary"/>

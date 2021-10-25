@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+      <template id="webclient_bootstrap" inherit_id="web.webclient_bootstrap">
+        <xpath expr="//t[@t-set='head']" position="after">
+            <t t-set="head_o_dory_server">
+                <meta name="theme-color" content="#6A96FE"/>
+	    </t>
+	    <t t-set="head" t-value="head_o_dory_server + (head or '')"/>
+	</xpath>
+      </template>
+</odoo>

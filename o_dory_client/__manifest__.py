@@ -11,10 +11,16 @@ Reproducing Keyword Search and Document Retrieval in Encrypted File-storing Syst
     "website": "",
     "version": "0.1",
     # any module necessary for this one to work correctly
-    "depends": ["base"],
+    "depends": ["web"],
     "data": [
+        "views/templates.xml",
         "security/ir.model.access.csv",
         "wizard/client_wizard_views.xml",
         "views/client_views.xml",
     ],
+    'assets': {
+        'web._assets_primary_variables': [
+            ('prepend', 'o_dory_client/static/src/scss/primary_variables.scss'),
+        ],
+    }
 }

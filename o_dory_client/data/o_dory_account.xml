@@ -1,6 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
   <data noupdate="0">
+
+    <record model="res.partner" id="base.partner_admin">
+      <field name="name">O-DORY Client</field>
+      <field name="image_1920" type="base64" file="o_dory_client/static/img/client-o-dory.png"/>
+    </record>
     
     <record id="account_alice" model="o.dory.account">
       <field name="name">Alice</field>

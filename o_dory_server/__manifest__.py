@@ -11,11 +11,12 @@ Reproducing Keyword Search and Document Retrieval in Encrypted File-storing Syst
     "website": "",
     "version": "0.1",
     # any module necessary for this one to work correctly
-    "depends": ["base"],
+    "depends": ["web"],
     "data": [
         "views/templates.xml",
         "security/ir.model.access.csv",
         "data/server_database.xml",
+        "data/server_folder.xml",
         "views/server_views.xml",
     ],
     "assets": {

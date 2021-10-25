@@ -78,7 +78,6 @@
 		<group>
 		  <group>
 		    <field name="name"/>
-		    <field name="oid"/>
 		    <field name="account"/>
 		    <field name="password" password="True"/>
 		    <field name="url"/>

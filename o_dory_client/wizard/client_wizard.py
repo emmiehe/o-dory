@@ -23,7 +23,7 @@ class ClientDataWizard(models.TransientModel):
         default="Unnamed",
         help="The filename will only be stored on the client for bookkeeping purposes. This information will not be sent to the server.",
     )
-    search_term = fields.Char("Search a Keyword")
+    search_term = fields.Char("Search Keyword")
     search_result = fields.Text("Search Result")
 
 

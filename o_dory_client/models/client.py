@@ -17,7 +17,7 @@ class ODoryAccount(models.Model):
 
     # we need to store user's account information on the o-dory client
     # active = fields.Boolean(string='Active', default=True)
-    oid = fields.Integer(string="O-DORY ID", required=True)
+    # oid = fields.Integer(string="O-DORY ID", required=True)
     account = fields.Char(string="O-DORY Account", required=True)
     password = fields.Char(string="O-DORY API Key", required=True)
     url = fields.Char(string="O-DORY Server URL", required=True)

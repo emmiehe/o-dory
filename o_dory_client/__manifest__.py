@@ -15,6 +15,7 @@ Reproducing Keyword Search and Document Retrieval in Encrypted File-storing Syst
     "data": [
         "views/templates.xml",
         "security/ir.model.access.csv",
+        "data/o_dory_account.xml",
         "wizard/client_wizard_views.xml",
         "views/client_views.xml",
     ],

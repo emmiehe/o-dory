@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <data noupdate="0">
+    
+    <record id="account_alice" model="o.dory.account">
+      <field name="name">Alice</field>
+      <field name="account">alice@example.com</field>
+      <field name="password">alice</field>
+      <field name="url">http://localhost:8899</field>
+      <field name="db">o_dory_server</field>
+    </record>
+    
+  </data>
+</odoo>

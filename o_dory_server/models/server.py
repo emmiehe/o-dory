@@ -29,7 +29,11 @@ class ServerFolder(models.Model):
         "res.users", ondelete="cascade", string="User", required=1
     )
     partition_ids = fields.One2many(
-        "server.folder.partition", "folder_id", string="Partitions", readonly=True
+        "server.folder.partition",
+        "folder_id",
+        string="Partitions",
+        readonly=True,
+        required=True,
     )
 
     @api.model_create_multi
@@ -69,10 +73,10 @@ class ServerFolderPartition(models.Model):
 
     name = fields.Char("Name")
     folder_id = fields.Many2one(
-        "server.folder", ondelete="cascade", string="Folder", required=1
+        "server.folder", ondelete="cascade", string="Folder", required=True
     )
     database_id = fields.Many2one(
-        "server.database", ondelete="restrict", string="Database", required=1
+        "server.database", ondelete="restrict", string="Database", required=True
     )
     user_id = fields.Many2one(related="folder_id.user_id")
 

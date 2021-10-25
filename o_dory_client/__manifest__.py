@@ -18,9 +18,9 @@ Reproducing Keyword Search and Document Retrieval in Encrypted File-storing Syst
         "wizard/client_wizard_views.xml",
         "views/client_views.xml",
     ],
-    'assets': {
-        'web._assets_primary_variables': [
-            ('prepend', 'o_dory_client/static/src/scss/primary_variables.scss'),
+    "assets": {
+        "web._assets_primary_variables": [
+            ("prepend", "o_dory_client/static/src/scss/primary_variables.scss"),
         ],
-    }
+    },
 }

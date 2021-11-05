@@ -5,6 +5,7 @@
     <record model="client.manager" id="client_demo_alice">
       <field name="name">Alice</field>
       <field name="bloom_filter_k" eval="255"/>
+      <field name="salt">somesalt</field>
     </record>
 
     <record id="account_alice1" model="o.dory.account">

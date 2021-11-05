@@ -4,8 +4,7 @@ from odoo.exceptions import UserError, ValidationError
 from xmlrpc import client
 
 # import odoo.addons.decimal_precision as dp
-import json, random, base64, re, string
-import hashlib
+import json, random, base64, re, string, hashlib
 
 
 class ClientManager(models.Model):
@@ -24,6 +23,11 @@ class ClientManager(models.Model):
 
     bloom_filter_k = fields.Integer("Bitmap Width", default=255)  # 1 byte
 
+    def _get_salt(self):
+        return "".join(random.choices(string.ascii_uppercase + string.digits, k=20))
+
+    salt = fields.Char("Salt", default=_get_salt)
+
     # a crude extraction
     def extract_keywords(self, raw_file):
         content = base64.decodebytes(raw_file).decode("utf-8").strip()
@@ -33,10 +37,12 @@ class ClientManager(models.Model):
     # todo: implement this seriously
     def compute_word_index(self, word):
         self.ensure_one()
-        return (
-            int(hashlib.sha256(word.encode("utf-8")).hexdigest(), 16)
+        res = (
+            int(hashlib.sha256((word + self.salt).encode()).hexdigest(), 16)
             & self.bloom_filter_k
         )
+        print("~~~~~~~~~~~~~~ word: index", word, res)
+        return res
 
     def make_bloom_filter_row(self, keywords):
         self.ensure_one()

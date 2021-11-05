@@ -93,7 +93,7 @@ class EncryptedDocument(models.Model):
 
     # not sure if we really need a name for the file, but keep it for now
     # name = fields.Char("Name")
-    blob = fields.Text("Encrypted Blob")  # maybe this should be binary
+    blob = fields.Binary("Encrypted Blob")  # maybe this should be binary
     folder_id = fields.Many2one("server.folder", ondelete="restrict", string="Folder")
     user_id = fields.Many2one(related="folder_id.user_id")
     version = fields.Integer("Version")

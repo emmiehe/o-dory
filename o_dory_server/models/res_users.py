@@ -9,29 +9,6 @@ _logger = logging.getLogger(__name__)
 class ResUsers(models.Model):
     _inherit = "res.users"
 
-    # # get partitions and verify version numbers
-    # def get_verified_partitions(self):
-    #     self.ensure_one()
-    #     partition_ids = self.env["server.folder.partition"].search(
-    #         [("user_id", "=", self.id)], order="bitmap_version desc"
-    #     )
-    #     if not partition_ids:
-    #         raise ValidationError(_("Cannot find related partitions."))
-    #     # make sure the versions of the partitions are the same
-    #     version = partition_ids[0].bitmap_version
-    #     bitmaps = partition_ids[0].bitmaps
-
-    #     for i in range(1, len(partition_ids)):
-    #         partition_id = partition_ids[i]
-    #         if partition_id.bitmap_version != version:
-    #             # force write
-    #             # todo: multi write?
-    #             partition_id.sudo().write(
-    #                 {"bitmaps": bitmaps, "bitmap_version": version}
-    #             )
-
-    #     return version, bitmaps, partition_ids
-
     def get_folder(self):
         self.ensure_one()
         folder_ids = self.env["server.folder"].search(
@@ -71,6 +48,9 @@ class ResUsers(models.Model):
 
         # bitmap operations
         bitmaps_obj = folder_id.bitmaps_deserialize(bitmaps)
+        print("got a bitmap obj -> ", bitmaps_obj)
+        raise ValidationError(_("noooo"))
+
         bitmaps_obj = folder_id.bitmaps_update(
             bitmaps_obj, doc_ids.ids, bloom_filter_rows
         )

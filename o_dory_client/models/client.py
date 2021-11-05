@@ -4,9 +4,7 @@ from odoo.exceptions import UserError, ValidationError
 from xmlrpc import client
 
 # import odoo.addons.decimal_precision as dp
-import json, random
-
-SAMPLE_KEYWORDS = ["apple", "berry", "carrot", "date"]
+import json, random, base64, re, string
 
 
 class ClientManager(models.Model):
@@ -22,6 +20,33 @@ class ClientManager(models.Model):
         "Document Records",
         help="Records for documents that are uploaded/updated from this client.",
     )
+
+    bloom_filter_k = fields.Integer("Bitmap Width", default=7)
+
+    # a crude extraction
+    def extract_keywords(self, raw_file):
+        res = base64.decodebytes(raw_file).decode("utf-8").strip()
+        return res
+
+    # todo: implement this seriously
+    def compute_word_index(self, word):
+        self.ensure_one()
+        return hash(word) % self.bloom_filter_k
+
+    def make_bloom_filter_row(self, keywords):
+        self.ensure_one()
+        res = [0] * self.bloom_filter_k
+        for keyword in keywords:
+            i = self.compute_word_index(keyword)
+            res[i] = 1
+        return res
+
+    # we don't really care about actual files for now
+    def encrypt(self, raw):
+        return raw
+
+    def decrypt(self, encrypted):
+        return encrypted
 
     # make sure servers are all available
     def verify_connections(self):
@@ -52,12 +77,27 @@ class ClientManager(models.Model):
 
     def upload(self, raw_data):
         self.verify_bitmap_consistency()
-        res_ids, filenames = None, None
+
+        files, rows, filenames = [], [], []
+        for rf, filename in raw_data:
+            keywords = self.extract_keywords(rf)
+            print("--> keywords: ", keywords)
+            row = self.make_bloom_filter_row(keywords)
+            encrypted_file = self.encrypt(rf)
+            files.append(encrypted_file)
+            rows.append(row)
+            filenames.append(filename)
+
+        if not files:
+            return []
+
+        data = [files, rows]
+
+        res_ids = None
         for account in self.account_ids:
-            doc_ids, fnames = account.upload(raw_data)
+            doc_ids = account.upload(data)
             if res_ids == None:
                 res_ids = doc_ids
-                filenames = fnames
             if res_ids != doc_ids:
                 raise ValidationError(_("Inconsistent uploading."))
 
@@ -96,9 +136,18 @@ class ClientManager(models.Model):
     # updating old file with the new raw file
     def update(self, fids, new_raw_files):
         self.verify_bitmap_consistency()
+
+        encrypted_files, rows = [], []
+        for new_raw_file in new_raw_files:
+            keywords = self.extract_keywords(new_raw_file)
+            row = self.make_bloom_filter_row(keywords)
+            encrypted_file = self.encrypt(new_raw_file)
+            encrypted_files.append(encrypted_file)
+            rows.append(row)
+
         res_ids = None
         for account in self.account_ids:
-            doc_ids = account.update(fids, new_raw_files)
+            doc_ids = account.update(fids, encrypted_files, rows)
             if res_ids == None:
                 res_ids = doc_ids
             if res_ids != doc_ids:
@@ -125,7 +174,7 @@ class ClientManager(models.Model):
         # self.verify_bitmap_consistency()
         return list(ids)
 
-    # retrive documents by ids
+    # retrieve documents by ids
     def retrieve_files(self, fids):  # a list of fid
         raise ValidationError(_("retrieve files failed"))
 
@@ -160,8 +209,6 @@ class ODoryAccount(models.Model):
     account = fields.Char(string="O-DORY Account", required=True)
     password = fields.Char(string="O-DORY API Key", required=True)
 
-    bloom_filter_k = fields.Integer("Bitmap Width", default=7)
-
     # misc for client
     def connect(self):
         self.ensure_one()
@@ -175,30 +222,6 @@ class ODoryAccount(models.Model):
             return False, err
 
         return uid, models
-
-    # for now this is a fake function
-    def extract_keywords(self, raw_file):
-        return random.choices(SAMPLE_KEYWORDS, k=2)
-
-    # todo: implement this seriously
-    def compute_word_index(self, word):
-        self.ensure_one()
-        return hash(word) % self.bloom_filter_k
-
-    def make_bloom_filter_row(self, keywords):
-        self.ensure_one()
-        res = [0] * self.bloom_filter_k
-        for keyword in keywords:
-            i = self.compute_word_index(keyword)
-            res[i] = 1
-        return res
-
-    # we don't really care about actual files for now
-    def encrypt(self, raw):
-        return raw
-
-    def decrypt(self, encrypted):
-        return encrypted
 
     # let the account object handle uploading, removing,
     # and updating (removing and uploading)
@@ -231,24 +254,10 @@ class ODoryAccount(models.Model):
     # (randomly for now as it is out of the scope)
     # we also should add a row to every partition's bitmaps
     # (or we can tell the master and let the master to do it)
-    def upload(self, raw_data):
+    def upload(self, data):
         uid, models = self.connect()
         if not uid:
             raise ValidationError(_("Connection Failed."))
-
-        files, rows, filenames = [], [], []
-        for rf, filename in raw_data:
-            keyword = self.extract_keywords(rf)
-            row = self.make_bloom_filter_row(keyword)
-            encrypted_file = self.encrypt(rf)
-            files.append(encrypted_file)
-            rows.append(row)
-            filenames.append(filename)
-
-        if not files:
-            return []
-
-        data = [files, rows]
 
         # todo catch exception
         res_ids = models.execute_kw(
@@ -260,7 +269,7 @@ class ODoryAccount(models.Model):
             [[uid], data],
         )
 
-        return res_ids, filenames
+        return res_ids
 
     # given document ids, we should remove the file from the server
     # the corresponding bitmaps row also need to be removed
@@ -283,18 +292,10 @@ class ODoryAccount(models.Model):
         return False
 
     # updating old file with the new raw file
-    def update(self, fids, new_raw_files):
+    def update(self, fids, encrypted_files, rows):
         uid, models = self.connect()
         if not uid:
             raise ValidationError(_("Connection Failed."))
-
-        encrypted_files, rows = [], []
-        for new_raw_file in new_raw_files:
-            keywords = self.extract_keywords(new_raw_file)
-            row = self.make_bloom_filter_row(keywords)
-            encrypted_file = self.encrypt(new_raw_file)
-            encrypted_files.append(encrypted_file)
-            rows.append(row)
 
         res = models.execute_kw(
             self.db,
@@ -337,9 +338,8 @@ class ODoryAccount(models.Model):
             [[uid], fids],
         )
 
-        res = [self.decrypt(e) for e in encrypted_documents]
-
-        # todo
+        # todo, the following should be done from the manager
+        # res = [self.decrypt(e) for e in encrypted_documents]
         # should do the auto download thing
         return res
 

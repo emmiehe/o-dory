@@ -17,7 +17,7 @@ class ServerFolder(models.Model):
     )
 
     bitmap_version = fields.Integer("Bitmap Version")
-    bitmap_width = fields.Integer("Bitmap Width", default=7)
+    bitmap_width = fields.Integer("Bitmap Width", default=255)
     bitmaps = fields.Binary("Bitmaps", attachment=False)
     # a field for display only
     bitmaps_str = fields.Char(
@@ -46,13 +46,16 @@ class ServerFolder(models.Model):
     def bitmaps_flip(self, bitmaps_obj):
         self.ensure_one()
         items = list(bitmaps_obj.items())
-        cols = [[0] * len(items)] * self.bitmap_width
+        cols = []
+        for i in range(self.bitmap_width):
+            cols.append([0] * len(items))
         row_to_doc = dict()
         for i in range(len(items)):
             doc_id, row = items[i]
             row_to_doc[i] = doc_id
             for j in range(len(row)):
                 cols[j][i] = row[j]
+        # print("...", cols, row_to_doc)
         return cols, row_to_doc
 
     def bitmaps_update(self, bitmaps_obj, doc_ids, rows):

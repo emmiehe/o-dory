@@ -5,6 +5,7 @@ from xmlrpc import client
 
 # import odoo.addons.decimal_precision as dp
 import json, random, base64, re, string
+import hashlib
 
 
 class ClientManager(models.Model):
@@ -21,17 +22,21 @@ class ClientManager(models.Model):
         help="Records for documents that are uploaded/updated from this client.",
     )
 
-    bloom_filter_k = fields.Integer("Bitmap Width", default=7)
+    bloom_filter_k = fields.Integer("Bitmap Width", default=255)  # 1 byte
 
     # a crude extraction
     def extract_keywords(self, raw_file):
-        res = base64.decodebytes(raw_file).decode("utf-8").strip()
+        content = base64.decodebytes(raw_file).decode("utf-8").strip()
+        res = re.findall("\w+", content)
         return res
 
     # todo: implement this seriously
     def compute_word_index(self, word):
         self.ensure_one()
-        return hash(word) % self.bloom_filter_k
+        return (
+            int(hashlib.sha256(word.encode("utf-8")).hexdigest(), 16)
+            & self.bloom_filter_k
+        )
 
     def make_bloom_filter_row(self, keywords):
         self.ensure_one()
@@ -83,6 +88,7 @@ class ClientManager(models.Model):
             keywords = self.extract_keywords(rf)
             print("--> keywords: ", keywords)
             row = self.make_bloom_filter_row(keywords)
+            print("--> bloom filter row: ", row)
             encrypted_file = self.encrypt(rf)
             files.append(encrypted_file)
             rows.append(row)
@@ -92,7 +98,7 @@ class ClientManager(models.Model):
             return []
 
         data = [files, rows]
-
+        print("-----> data", data)
         res_ids = None
         for account in self.account_ids:
             doc_ids = account.upload(data)
@@ -185,9 +191,10 @@ class ClientManager(models.Model):
         # todo
         indices = [self.compute_word_index(k) for k in keywords]
         print("search indices: ", indices)
-        ids = []
+        ids = set()
         for account in self.account_ids:
-            nids = account.search_keywords_indices(indices)
+            nids = set(account.search_keywords_indices(indices))
+            print("result: ", nids, ids)
             if not ids:
                 ids = nids
             elif ids != nids:
@@ -196,7 +203,7 @@ class ClientManager(models.Model):
                 )
 
         self.verify_bitmap_consistency()
-        return ids
+        return list(ids)
 
 
 class ODoryAccount(models.Model):

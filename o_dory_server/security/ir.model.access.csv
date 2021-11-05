@@ -1,5 +1,3 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
 access_encrypted_document,access_encrypted_document,o_dory_server.model_encrypted_document,,1,1,1,1
-access_server_database,access_server_database,o_dory_server.model_server_database,,1,1,1,1
 access_server_folder,access_server_folder,o_dory_server.model_server_folder,,1,1,1,1
-access_server_folder_partition,access_server_folder_partition,o_dory_server.model_server_folder_partition,,1,1,1,1

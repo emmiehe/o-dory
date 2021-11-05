@@ -2,23 +2,34 @@
 <odoo>
   <data noupdate="0">
 
+    <record model="client.manager" id="client_demo_alice">
+      <field name="name">Alice</field>
+    </record>
+
+    <record id="account_alice1" model="o.dory.account">
+      <field name="account">alice@example.com</field>
+      <field name="password">alice</field>
+      <field name="url">http://localhost:8898</field>
+      <field name="db">o_dory_server_one</field>
+      <field name="manager_id" ref="client_demo_alice"/>
+    </record>
+
+    <record id="account_alice2" model="o.dory.account">
+      <field name="account">alice@example.com</field>
+      <field name="password">alice</field>
+      <field name="url">http://localhost:8899</field>
+      <field name="db">o_dory_server_two</field>
+      <field name="manager_id" ref="client_demo_alice"/>
+    </record>
+
     <record model="res.partner" id="base.partner_admin">
       <field name="name">O-DORY Client</field>
-      <field name="image_1920" type="base64" file="o_dory_client/static/img/client-o-dory.png"/>
-     
+      <field name="image_1920" type="base64" file="o_dory_client/static/img/client-o-dory.png"/> 
     </record>
 
     <record id="base.user_admin" model="res.users">
        <field name="signature" type="xml"><span>-- <br/>O-DORY Client (profile pic generated at https://robohash.org/)</span></field>
     </record>
-    
-    <record id="account_alice" model="o.dory.account">
-      <field name="name">Alice</field>
-      <field name="account">alice@example.com</field>
-      <field name="password">alice</field>
-      <field name="url">http://localhost:8899</field>
-      <field name="db">o_dory_server</field>
-    </record>
-    
+        
   </data>
 </odoo>

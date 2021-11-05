@@ -49,24 +49,30 @@
     <!--   <field name="view_mode">tree,form</field> -->
     <!-- </record> -->
 
-    <record id="view_o_dory_account" model="ir.ui.view">
-      <field name="name">o.dory.account.view</field>
-      <field name="model">o.dory.account</field>
+    <record id="view_client_manager" model="ir.ui.view">
+      <field name="name">client.manager.view</field>
+      <field name="model">client.manager</field>
       <field name="arch" type="xml">
 	<form>
 	  <header>
-	    <button string="Test Connection" type="object" name="verify_connection" class="btn-secondary"/>
+	    <button string="Test Connections" type="object" name="verify_connections" class="btn-secondary"/>
 	    <button string="Retrieve Document IDs from Server" type="object" name="retrieve_ids" class="btn-secondary"/>
 	    <button string="Upload Files" type="action" name="%(action_client_upload_wizard)d" class="btn-primary"/>
 	    <button string="Remove Files" type="action" name="%(action_client_remove_wizard)d" class="btn-primary"/>
 	    <button string="Update Files" type="action" name="%(action_client_update_wizard)d" class="btn-primary"/>
 	    <button string="Search Keywords" type="action" name="%(action_client_search_wizard)d" class="btn-primary"/>
 	  </header>
-	  <sheet>		    
+	  <sheet>
+	    <group>
+	      <group>
+		<field name="name"/>
+	      </group>
+	    </group>
+
 	    <notebook>
               <page name="document_records" string="Document Records">
                 <group>
-                  <field name="document_ids" widget="one2many" nolabel="1" context="{'default_account_id': active_id}">
+                  <field name="document_ids" widget="one2many" nolabel="1" context="{'default_manager_id': active_id}">
                     <tree name="tree_document_record" string="Document Records" editable="bottom">
                       <field name="doc_id"/>
                       <field name="name"/>
@@ -74,15 +80,17 @@
                   </field>
                 </group>
               </page>
-	      <page name="account_info" string="Account Info">
+	      <page name="accounts_info" string="Accounts Info">
 		<group>
-		  <group>
-		    <field name="name"/>
-		    <field name="account"/>
-		    <field name="password" password="True"/>
-		    <field name="url"/>
-		    <field name="db"/>
-		  </group>
+		  <field name="account_ids" widget="one2many" nolabel="1" context="{'default_manager_id': active_id}">
+                    <tree name="tree_account" string="Accounts" editable="bottom">
+		      <!-- <field name="name"/> -->
+		      <field name="url"/>
+		      <field name="db"/>
+		      <field name="account"/>
+		      <field name="password" password="True"/>
+                    </tree>              
+                  </field>
 		</group>
 	      </page>
 	    </notebook>
@@ -93,13 +101,13 @@
 
 
     <record id="action_client" model="ir.actions.act_window">
-      <field name="name">O-DORY Account</field>
-      <field name="res_model">o.dory.account</field>
+      <field name="name">O-DORY Client Managers</field>
+      <field name="res_model">client.manager</field>
       <field name="view_mode">tree,form</field>
       <field name="context">{}</field>
     </record>
    
-    <menuitem id="menu_o_dory_account" name="O-DORY Accounts" action="action_client" sequence="7" active="1"/>
+    <menuitem id="menu_client_manager" name="O-DORY Client Managers" action="action_client" sequence="7" active="1"/>
 
     
   </data>

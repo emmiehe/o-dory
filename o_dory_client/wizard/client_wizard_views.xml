@@ -10,7 +10,7 @@
                 <form string="O-DORY Client Upload">
                   <sheet>
                     <group>
-		      <field name="account_id" readonly="1"/>
+		      <field name="manager_id" readonly="1"/>
 		    </group>
 		    <field name="data_ids" widget="one2many" nolabel="1" context="{'default_wizard_id': active_id}">
 		      <tree name="tree_data_upload" string="Upload Data" editable="bottom">
@@ -37,7 +37,7 @@
                 <form string="O-DORY Client Remove">
                   <sheet>
                     <group>
-		      <field name="account_id" readonly="1"/>
+		      <field name="manager_id" readonly="1"/>
 		    </group>
 		    <field name="data_ids" widget="one2many" nolabel="1" context="{'default_wizard_id': active_id}">
 		      <tree name="tree_data_remove" string="Remove by IDs" editable="bottom">
@@ -62,7 +62,7 @@
                 <form string="O-DORY Client Update">
                   <sheet>
                     <group>
-		      <field name="account_id" readonly="1"/>
+		      <field name="manager_id" readonly="1"/>
 		    </group>
 		    <field name="data_ids" widget="one2many" nolabel="1" context="{'default_wizard_id': active_id}">
 		      <tree name="tree_data_update" string="Update Files" editable="bottom">
@@ -88,7 +88,7 @@
                 <form string="O-DORY Client Search">
                   <sheet>
                     <group>
-		      <field name="account_id" readonly="1"/>
+		      <field name="manager_id" readonly="1"/>
                     </group>
 		    <field name="data_ids" widget="one2many" nolabel="1" context="{'default_wizard_id': active_id}">
 		      <tree name="tree_data_search" string="Search by Keywords" editable="bottom">
@@ -113,7 +113,7 @@
                 <form string="O-DORY Client Search">
                   <sheet>
                     <group>
-		      <field name="account_id" readonly="1"/>
+		      <field name="manager_id" readonly="1"/>
                     </group>
 		    <field name="data_ids" widget="one2many" nolabel="1" context="{'default_wizard_id': active_id}" readonly="1">
 		      <tree name="tree_data_search_results" string="Search Results" editable="false" delete="false">

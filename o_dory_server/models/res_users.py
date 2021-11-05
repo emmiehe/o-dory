@@ -9,40 +9,56 @@ _logger = logging.getLogger(__name__)
 class ResUsers(models.Model):
     _inherit = "res.users"
 
-    # get partitions and verify version numbers
-    def get_verified_partitions(self):
+    # # get partitions and verify version numbers
+    # def get_verified_partitions(self):
+    #     self.ensure_one()
+    #     partition_ids = self.env["server.folder.partition"].search(
+    #         [("user_id", "=", self.id)], order="bitmap_version desc"
+    #     )
+    #     if not partition_ids:
+    #         raise ValidationError(_("Cannot find related partitions."))
+    #     # make sure the versions of the partitions are the same
+    #     version = partition_ids[0].bitmap_version
+    #     bitmaps = partition_ids[0].bitmaps
+
+    #     for i in range(1, len(partition_ids)):
+    #         partition_id = partition_ids[i]
+    #         if partition_id.bitmap_version != version:
+    #             # force write
+    #             # todo: multi write?
+    #             partition_id.sudo().write(
+    #                 {"bitmaps": bitmaps, "bitmap_version": version}
+    #             )
+
+    #     return version, bitmaps, partition_ids
+
+    def get_folder(self):
         self.ensure_one()
-        partition_ids = self.env["server.folder.partition"].search(
-            [("user_id", "=", self.id)], order="bitmap_version desc"
-        )
-        if not partition_ids:
-            raise ValidationError(_("Cannot find related partitions."))
-        # make sure the versions of the partitions are the same
-        version = partition_ids[0].bitmap_version
-        bitmaps = partition_ids[0].bitmaps
+        folder_ids = self.env["server.folder"].search(
+            [("user_id", "=", self.id)], limit=1
+        )  # one user should only have one folder on a server
+        if not folder_ids:
+            raise ValidationError(_("Cannot find related folder."))
+        folder_id = folder_ids[0]
+        version = folder_id.bitmap_version
+        bitmaps = folder_id.bitmaps
+        return folder_id, bitmaps, version
 
-        for i in range(1, len(partition_ids)):
-            partition_id = partition_ids[i]
-            if partition_id.bitmap_version != version:
-                # force write
-                # todo: multi write?
-                partition_id.sudo().write(
-                    {"bitmaps": bitmaps, "bitmap_version": version}
-                )
-
-        return version, bitmaps, partition_ids
+    def get_bitmaps_version(self):
+        __, __, version = self.get_folder()
+        return version
 
     def upload_encrypted_files(self, encrypted_data):
         self.ensure_one()
         encrypted_documents, bloom_filter_rows = encrypted_data
-        version, bitmaps, partition_ids = self.get_verified_partitions()
+        folder_id, bitmaps, version = self.get_folder()
 
         # upload the encrypted_document
         doc_ids = self.env["encrypted.document"].create(
             [
                 {
                     "blob": encrypted_document,
-                    "partition_id": random.choice(partition_ids).id,
+                    "folder_id": folder_id.id,
                     "user_id": self.id,
                 }
                 for encrypted_document in encrypted_documents
@@ -54,21 +70,19 @@ class ResUsers(models.Model):
             raise ValidationError(_("Error creating files."))
 
         # bitmap operations
-        bitmaps_obj = partition_ids.bitmaps_deserialize(bitmaps)
-        bitmaps_obj = partition_ids.bitmaps_update(
+        bitmaps_obj = folder_id.bitmaps_deserialize(bitmaps)
+        bitmaps_obj = folder_id.bitmaps_update(
             bitmaps_obj, doc_ids.ids, bloom_filter_rows
         )
-        new_bitmaps = partition_ids.bitmaps_serialize(bitmaps_obj)
+        new_bitmaps = folder_id.bitmaps_serialize(bitmaps_obj)
 
-        partition_ids.sudo().write(
-            {"bitmaps": new_bitmaps, "bitmap_version": version + 1}
-        )
+        folder_id.sudo().write({"bitmaps": new_bitmaps, "bitmap_version": version + 1})
 
         return doc_ids.ids
 
     def remove_encrypted_files_by_ids(self, fids):
         self.ensure_one()
-        version, bitmaps, partition_ids = self.get_verified_partitions()
+        folder_id, bitmaps, version = self.get_folder()
 
         # iterate over doc_ids to avoid deleting files not belonging to the user
         doc_ids = self.env["encrypted.document"].search(
@@ -84,13 +98,13 @@ class ResUsers(models.Model):
             ddoc_ids = [str(i) for i in doc_ids.ids]
             doc_ids.unlink()
             # deserialize
-            bitmaps_obj = partition_ids.bitmaps_deserialize(bitmaps)
+            bitmaps_obj = folder_id.bitmaps_deserialize(bitmaps)
 
-            res = partition_ids.bitmaps_remove(bitmaps_obj, ddoc_ids)
+            res = folder_id.bitmaps_remove(bitmaps_obj, ddoc_ids)
 
-            new_bitmaps = partition_ids.bitmaps_serialize(bitmaps_obj)
+            new_bitmaps = folder_id.bitmaps_serialize(bitmaps_obj)
 
-            partition_ids.sudo().write(
+            folder_id.sudo().write(
                 {"bitmaps": new_bitmaps, "bitmap_version": version + 1}
             )
 
@@ -98,7 +112,7 @@ class ResUsers(models.Model):
 
     def update_files_by_ids(self, encrypted_data):
         fids, encrypted_documents, bloom_filter_rows = encrypted_data
-        version, bitmaps, partition_ids = self.get_verified_partitions()
+        folder_id, bitmaps, version = self.get_folder()
 
         # verify the old file exists
         doc_ids = self.env["encrypted.document"].search(
@@ -118,15 +132,13 @@ class ResUsers(models.Model):
             doc_id.write({"blob": encrypted_document})
 
         # bitmap operations
-        bitmaps_obj = partition_ids.bitmaps_deserialize(bitmaps)
-        bitmaps_obj = partition_ids.bitmaps_update(
+        bitmaps_obj = folder_id.bitmaps_deserialize(bitmaps)
+        bitmaps_obj = folder_id.bitmaps_update(
             bitmaps_obj, doc_ids.ids, bloom_filter_rows
         )
-        new_bitmaps = partition_ids.bitmaps_serialize(bitmaps_obj)
+        new_bitmaps = folder_id.bitmaps_serialize(bitmaps_obj)
 
-        partition_ids.sudo().write(
-            {"bitmaps": new_bitmaps, "bitmap_version": version + 1}
-        )
+        folder_id.sudo().write({"bitmaps": new_bitmaps, "bitmap_version": version + 1})
 
         return True
 

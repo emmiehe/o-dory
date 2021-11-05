@@ -9,54 +9,172 @@ import json, random
 SAMPLE_KEYWORDS = ["apple", "berry", "carrot", "date"]
 
 
+class ClientManager(models.Model):
+    _name = "client.manager"
+    _description = "Client Manager"
+
+    name = fields.Char("Name", required=True)
+    account_ids = fields.One2many("o.dory.account", "manager_id", "Accounts")
+
+    document_ids = fields.One2many(
+        "document.record",
+        "manager_id",
+        "Document Records",
+        help="Records for documents that are uploaded/updated from this client.",
+    )
+
+    # make sure servers are all available
+    def verify_connections(self):
+        self.ensure_one()
+        for account in self.account_ids:
+            uid, models = account.connect()
+            if not uid:
+                raise ValidationError(
+                    _(
+                        "Connection Test Failed. {}({}):{} ".format(
+                            account.url, account.db, models
+                        )
+                    )
+                )
+        raise UserError(_("Connections Test Succeeded!"))
+
+    # we only want to verify consistency, but not implement it
+    def verify_bitmap_consistency(self):
+        self.ensure_one()
+        if len(self.account_ids) < 2:
+            raise ValidationError(
+                _("Consistency verification needs at least two server accounts.")
+            )
+
+        versions = [a.retrieve_bitmaps_version() for a in self.account_ids]
+        print("bitmaps versions -----> ", versions)
+        return all(v == versions[0] for v in versions)
+
+    def upload(self, raw_data):
+        self.verify_bitmap_consistency()
+        res_ids, filenames = None, None
+        for account in self.account_ids:
+            doc_ids, fnames = account.upload(raw_data)
+            if res_ids == None:
+                res_ids = doc_ids
+                filenames = fnames
+            if res_ids != doc_ids:
+                raise ValidationError(_("Inconsistent uploading."))
+
+        if res_ids != None:
+            self.env["document.record"].create(
+                [
+                    {
+                        "manager_id": self.id,
+                        "doc_id": res_ids[i],
+                        "name": filenames[i],
+                    }
+                    for i in range(len(res_ids))
+                ]
+            )
+
+        self.verify_bitmap_consistency()
+        return res_ids
+
+    def remove(self, fids):
+        self.verify_bitmap_consistency()
+        res = False
+        for account in self.account_ids:
+            res = account.remove(fids)
+            if not res:
+                raise ValidationError(_("Inconsistent removing."))
+
+        if res:
+            rec_ids = self.env["document.record"].search(
+                [("manager_id", "=", self.id), ("doc_id", "in", fids)]
+            )
+            rec_ids.unlink()
+
+        self.verify_bitmap_consistency()
+        return res
+
+    # updating old file with the new raw file
+    def update(self, fids, new_raw_files):
+        self.verify_bitmap_consistency()
+        res_ids = None
+        for account in self.account_ids:
+            doc_ids = account.update(fids, new_raw_files)
+            if res_ids == None:
+                res_ids = doc_ids
+            if res_ids != doc_ids:
+                raise ValidationError(_("Inconsistent updating."))
+
+        self.verify_bitmap_consistency()
+        return res_ids
+
+    def retrieve_ids(self):
+        # self.verify_bitmap_consistency()
+        ids = set()
+        for account in self.account_ids:
+            ids = ids.union(set(account.retrieve_ids()))
+
+        if ids:
+            oids = self.env["document.record"].search_read(
+                [("manager_id", "=", self.id)], fields=["doc_id"]
+            )
+            oids = [o.get("doc_id") for o in oids]
+            nids = [i for i in ids if i not in oids]
+            self.env["document.record"].create(
+                [{"doc_id": i, "manager_id": self.id, "name": "Unnamed"} for i in nids]
+            )
+        # self.verify_bitmap_consistency()
+        return list(ids)
+
+    # retrive documents by ids
+    def retrieve_files(self, fids):  # a list of fid
+        raise ValidationError(_("retrieve files failed"))
+
+    # prepare dpf secrets here and send to each partitions
+    # should not send all secrets to central server/master
+    def search_keyword(self, keyword):
+        self.verify_bitmap_consistency()
+        # todo
+        self.verify_bitmap_consistency()
+        raise ValidationError(_("search keyword failed"))
+
+
 class ODoryAccount(models.Model):
     _name = "o.dory.account"
     _description = "O-DORY Account"
 
-    name = fields.Char("Name", required=True)
+    manager_id = fields.Many2one(
+        "client.manager", ondelete="restrict", string="Client Manager"
+    )
+
+    # name = fields.Char("Name") # optional name
 
     # we need to store user's account information on the o-dory client
     # active = fields.Boolean(string='Active', default=True)
     # oid = fields.Integer(string="O-DORY ID", required=True)
-    account = fields.Char(string="O-DORY Account", required=True)
-    password = fields.Char(string="O-DORY API Key", required=True)
     url = fields.Char(string="O-DORY Server URL", required=True)
     db = fields.Char(
         string="Odoo Server DB",
         required=True,
         help="This is Odoo specific term. Do not confuse this with O-DORY database",
     )
-    bloom_filter_k = fields.Integer("Bitmap Width", default=7)
+    account = fields.Char(string="O-DORY Account", required=True)
+    password = fields.Char(string="O-DORY API Key", required=True)
 
-    document_ids = fields.One2many(
-        "document.record",
-        "account_id",
-        "Document Records",
-        help="Records for documents that are uploaded/updated from this client.",
-    )
+    bloom_filter_k = fields.Integer("Bitmap Width", default=7)
 
     # misc for client
     def connect(self):
         self.ensure_one()
         # Logging in
-        common = client.ServerProxy("{}/xmlrpc/2/common".format(self.url))
-        # print(common.version())
-        uid = common.authenticate(self.db, self.account, self.password, {})
-        # getting models
-        models = client.ServerProxy("{}/xmlrpc/2/object".format(self.url))
+        try:
+            common = client.ServerProxy("{}/xmlrpc/2/common".format(self.url))
+            uid = common.authenticate(self.db, self.account, self.password, {})
+            # getting models
+            models = client.ServerProxy("{}/xmlrpc/2/object".format(self.url))
+        except client.Error as err:
+            return False, err
+
         return uid, models
-
-    # make sure servers are all available
-    def verify_connection(self):
-        uid, models = self.connect()
-        if uid and models:
-            raise UserError(_("Connection Test Succeeded!"))
-        else:
-            raise ValidationError(_("Connection Test Failed. {} ".format(models)))
-
-    # verify if server partitions all have the same version
-    def verify_server_partitions(self):
-        return True
 
     # for now this is a fake function
     def extract_keywords(self, raw_file):
@@ -84,6 +202,30 @@ class ODoryAccount(models.Model):
 
     # let the account object handle uploading, removing,
     # and updating (removing and uploading)
+
+    # get the bitmap version from the server
+    def retrieve_bitmaps_version(self):
+        uid, models = self.connect()
+        if not uid:
+            raise ValidationError(_("Connection Failed."))
+        version = models.execute_kw(
+            self.db,
+            uid,
+            self.password,
+            "res.users",
+            "get_bitmaps_version",
+            [[uid]],
+        )
+        if version != None:
+            return version
+        else:
+            raise ValidationError(
+                _(
+                    "Cannot retrieve the bitmap version from server {}({}).".format(
+                        self.url, self.db
+                    )
+                )
+            )
 
     # given raw files, we should upload to a partition
     # (randomly for now as it is out of the scope)
@@ -118,19 +260,7 @@ class ODoryAccount(models.Model):
             [[uid], data],
         )
 
-        if res_ids != None:
-            self.env["document.record"].create(
-                [
-                    {
-                        "account_id": self.id,
-                        "doc_id": res_ids[i],
-                        "name": filenames[i],
-                    }
-                    for i in range(len(res_ids))
-                ]
-            )
-
-        return res_ids
+        return res_ids, filenames
 
     # given document ids, we should remove the file from the server
     # the corresponding bitmaps row also need to be removed
@@ -148,11 +278,6 @@ class ODoryAccount(models.Model):
                 [[uid], fids],
             )
 
-            if res:
-                rec_ids = self.env["document.record"].search(
-                    [("account_id", "=", self.id), ("doc_id", "in", fids)]
-                )
-                rec_ids.unlink()
             return res
 
         return False
@@ -195,16 +320,6 @@ class ODoryAccount(models.Model):
             [[uid]],
         )
 
-        if ids:
-            oids = self.env["document.record"].search_read(
-                [("account_id", "=", self.id)], fields=["doc_id"]
-            )
-            oids = [o.get("doc_id") for o in oids]
-            nids = [i for i in ids if i not in oids]
-            self.env["document.record"].create(
-                [{"doc_id": i, "account_id": self.id, "name": "Unnamed"} for i in nids]
-            )
-
         return ids
 
     # retrive documents by ids
@@ -246,10 +361,10 @@ class DocumentRecord(models.Model):
     # allow a name field for the customer to map
     name = fields.Char("File Name")
     doc_id = fields.Integer("Document ID", required=True)
-    account_id = fields.Many2one(
-        "o.dory.account",
+    manager_id = fields.Many2one(
+        "client.manager",
         ondelete="restrict",
-        string="O-DORY Account",
+        string="O-DORY Client Manager",
         required=True,
         readonly=True,
     )

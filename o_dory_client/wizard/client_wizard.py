@@ -34,11 +34,11 @@ class ClientWizard(models.TransientModel):
     data_ids = fields.One2many("client.data.wizard", "wizard_id", string="Data")
 
     # explicitly pass in context
-    def _default_account(self):
-        return self.env["o.dory.account"].browse(self.env.context.get("active_id"))
+    def _default_manager(self):
+        return self.env["client.manager"].browse(self.env.context.get("active_id"))
 
-    account_id = fields.Many2one(
-        "o.dory.account", string="O-DORY Account", default=_default_account
+    manager_id = fields.Many2one(
+        "client.manager", string="O-DORY Client Manager", default=_default_manager
     )
 
     def action_do_upload(self):
@@ -46,14 +46,14 @@ class ClientWizard(models.TransientModel):
         if self.data_ids:
             raw_data = self.data_ids.mapped("raw_file")
             filenames = self.data_ids.mapped("filename")
-            self.account_id.upload(list(zip(raw_data, filenames)))
+            self.manager_id.upload(list(zip(raw_data, filenames)))
         return {"type": "ir.actions.act_window_close"}
 
     def action_do_remove(self):
         self.ensure_one()
         if self.data_ids:
             doc_ids = self.data_ids.mapped("document_id")
-            self.account_id.remove(doc_ids)
+            self.manager_id.remove(doc_ids)
         return {"type": "ir.actions.act_window_close"}
 
     def action_do_update(self):
@@ -62,13 +62,13 @@ class ClientWizard(models.TransientModel):
             doc_ids = self.data_ids.mapped("document_id")
             raw_data = self.data_ids.mapped("raw_file")
             if doc_ids and raw_data and len(doc_ids) == len(raw_data):
-                self.account_id.update(doc_ids, raw_data)
+                self.manager_id.update(doc_ids, raw_data)
         return {"type": "ir.actions.act_window_close"}
 
     def action_do_search(self):
         self.ensure_one()
         for data in self.data_ids:
-            res = self.account_id.search_keyword(data.search_term)
+            res = self.manager_id.search_keyword(data.search_term)
             # give a list of document ids that contains that keyword
             data.search_result = "search functionality not in place: {}".format(res)
 

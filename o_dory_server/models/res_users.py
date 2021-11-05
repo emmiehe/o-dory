@@ -48,8 +48,6 @@ class ResUsers(models.Model):
 
         # bitmap operations
         bitmaps_obj = folder_id.bitmaps_deserialize(bitmaps)
-        print("got a bitmap obj -> ", bitmaps_obj)
-        raise ValidationError(_("noooo"))
 
         bitmaps_obj = folder_id.bitmaps_update(
             bitmaps_obj, doc_ids.ids, bloom_filter_rows
@@ -150,3 +148,20 @@ class ResUsers(models.Model):
             )
 
         return [d.blob for d in doc_ids]
+
+    # this is the naive model
+    def search_documents_by_keyword_indices(self, indices):
+        self.ensure_one()
+        # todo: the returned bitmaps should be deserialized?
+        folder_id, bitmaps, version = self.get_folder()
+        cols, row_to_doc = folder_id.bitmaps_flip(
+            folder_id.bitmaps_deserialize(bitmaps)
+        )
+        cols = [cols[i] for i in range(len(cols)) if i in indices]
+        ret = set()
+        for col in cols:
+            for i, row in enumerate(col):
+                if row:
+                    ret.add(row_to_doc.get(i))
+
+        return list(ret)

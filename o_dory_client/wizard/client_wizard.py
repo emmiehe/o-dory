@@ -68,9 +68,11 @@ class ClientWizard(models.TransientModel):
     def action_do_search(self):
         self.ensure_one()
         for data in self.data_ids:
-            res = self.manager_id.search_keyword(data.search_term)
+            res = self.manager_id.search_keywords([data.search_term])
             # give a list of document ids that contains that keyword
-            data.search_result = "search functionality not in place: {}".format(res)
+            data.search_result = "These documents may contain <{}>: {}".format(
+                data.search_term, res
+            )
 
         action_window = {
             "type": "ir.actions.act_window",

@@ -180,11 +180,23 @@ class ClientManager(models.Model):
 
     # prepare dpf secrets here and send to each partitions
     # should not send all secrets to central server/master
-    def search_keyword(self, keyword):
+    def search_keywords(self, keywords):
         self.verify_bitmap_consistency()
         # todo
+        indices = [self.compute_word_index(k) for k in keywords]
+        print("search indices: ", indices)
+        ids = []
+        for account in self.account_ids:
+            nids = account.search_keywords_indices(indices)
+            if not ids:
+                ids = nids
+            elif ids != nids:
+                raise ValidationError(
+                    _("Inconsistent search possibly due to inconsistent bitmaps")
+                )
+
         self.verify_bitmap_consistency()
-        raise ValidationError(_("search keyword failed"))
+        return ids
 
 
 class ODoryAccount(models.Model):
@@ -345,13 +357,20 @@ class ODoryAccount(models.Model):
 
     # prepare dpf secrets here and send to each partitions
     # should not send all secrets to central server/master
-    def search_keyword(self, keyword):
+    def search_keywords_indices(self, indices):
         uid, models = self.connect()
         if not uid:
             raise ValidationError(_("Connection Failed."))
+        res_ids = models.execute_kw(
+            self.db,
+            uid,
+            self.password,
+            "res.users",
+            "search_documents_by_keyword_indices",
+            [[uid], indices],
+        )
 
-        res = []
-        return res
+        return res_ids
 
 
 class DocumentRecord(models.Model):

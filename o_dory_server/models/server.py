@@ -45,7 +45,7 @@ class ServerFolder(models.Model):
     # should give a 2d array and a map of row_index to doc_id
     def bitmaps_flip(self, bitmaps_obj):
         self.ensure_one()
-        items = bitmaps_obj.items()
+        items = list(bitmaps_obj.items())
         cols = [[0] * len(items)] * self.bitmap_width
         row_to_doc = dict()
         for i in range(len(items)):

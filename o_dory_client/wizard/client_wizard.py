@@ -70,7 +70,7 @@ class ClientWizard(models.TransientModel):
         for data in self.data_ids:
             res = self.manager_id.search_keywords([data.search_term])
             # give a list of document ids that contains that keyword
-            data.search_result = "These documents may contain <{}>: {}".format(
+            data.search_result = "These documents may contain '{}': {}".format(
                 data.search_term, res
             )
 

@@ -41,7 +41,7 @@ class ClientManager(models.Model):
             int(hashlib.sha256((word + self.salt).encode()).hexdigest(), 16)
             & self.bloom_filter_k
         )
-        print("~~~~~~~~~~~~~~ word: index", word, res)
+        # print("~~~~~~~~~~~~~~ word: index", word, res)
         return res
 
     def make_bloom_filter_row(self, keywords):
@@ -92,9 +92,9 @@ class ClientManager(models.Model):
         files, rows, filenames = [], [], []
         for rf, filename in raw_data:
             keywords = self.extract_keywords(rf)
-            print("--> keywords: ", keywords)
+            # print("--> keywords: ", keywords)
             row = self.make_bloom_filter_row(keywords)
-            print("--> bloom filter row: ", row)
+            # print("--> bloom filter row: ", row)
             encrypted_file = self.encrypt(rf)
             files.append(encrypted_file)
             rows.append(row)
@@ -104,7 +104,7 @@ class ClientManager(models.Model):
             return []
 
         data = [files, rows]
-        print("-----> data", data)
+        # print("-----> data", data)
         res_ids = None
         for account in self.account_ids:
             doc_ids = account.upload(data)
@@ -196,11 +196,11 @@ class ClientManager(models.Model):
         self.verify_bitmap_consistency()
         # todo
         indices = [self.compute_word_index(k) for k in keywords]
-        print("search indices: ", indices)
+        # print("search indices: ", indices)
         ids = set()
         for account in self.account_ids:
             nids = set(account.search_keywords_indices(indices))
-            print("result: ", nids, ids)
+            # print("result: ", nids, ids)
             if not ids:
                 ids = nids
             elif ids != nids:

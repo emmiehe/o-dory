@@ -5,7 +5,11 @@ from xmlrpc import client
 
 # import odoo.addons.decimal_precision as dp
 import mmh3
+import numpy as np
+import sycret, random
 import json, random, base64, re, string, hashlib
+
+eq = sycret.EqFactory(n_threads=6)
 
 
 class ClientManager(models.Model):
@@ -93,6 +97,19 @@ class ClientManager(models.Model):
         versions = [a.retrieve_bitmaps_version() for a in self.account_ids]
         print("bitmaps versions -----> ", versions)
         return all(v == versions[0] for v in versions)
+
+    def get_doc_count(self):
+        self.ensure_one()
+        if len(self.account_ids) < 2:
+            raise ValidationError(
+                _("Consistency verification needs at least two server accounts.")
+            )
+
+        counts = [a.retrieve_doc_count() for a in self.account_ids]
+        print("counts -----> ", counts)
+        if not all(c == counts[0] for c in counts):
+            raise ValidationError(_("Inconsistent doc counts."))
+        return counts[0]
 
     def upload(self, raw_data):
         self.verify_bitmap_consistency()
@@ -198,9 +215,67 @@ class ClientManager(models.Model):
     def retrieve_files(self, fids):  # a list of fid
         raise ValidationError(_("retrieve files failed"))
 
+    def prepare_dpf(self, target_indices):
+        self.verify_bitmap_consistency()
+        doc_num = self.get_doc_count()
+        # the idea is that we want dpf for every column
+        # the end results should be two chunks
+        a, b = [], []
+        # slightly worried about perf
+        for i in range(self.bloom_filter_k):
+            keys_a, keys_b = eq.keygen(doc_num)
+            # Reshape to a C-contiguous array (necessary for from_buffer)
+            alpha = eq.alpha(keys_a, keys_b)
+            x = alpha.astype(np.int32)
+
+            # change non-target columns to 0
+            if i not in target_indices:
+                for k in range(doc_num):
+                    r = random.randint(-100, 100)
+                    x[k] += r if r else 10  # avoid not adding anything
+
+            # print(x)
+            x = x.tolist()
+            a.append([x, keys_a.tolist()])
+            b.append([x.copy(), keys_b.tolist()])
+
+        self.verify_bitmap_consistency()
+        return a, b
+
     # prepare dpf secrets here and send to each partitions
     # should not send all secrets to central server/master
     def search_keywords(self, keywords):
+        self.verify_bitmap_consistency()
+        if len(self.account_ids) != 2:
+            raise ValidationError(_("Need exactly two servers for searching."))
+
+        # todo: for now only consider keywords is a list of one element
+        # due to the wizard/frontend setup this is actually true
+        indices = []
+        for keyword in keywords:
+            indices.extend(self.compute_word_indices(keyword))
+
+        a, b = self.prepare_dpf(indices)
+        account_a, account_b = self.account_ids[0], self.account_ids[1]
+        rs_a = account_a.search_keywords(0, a)
+        rs_b = account_b.search_keywords(1, b)
+        # combining results
+        results = []
+        for i, ra in enumerate(rs_a):
+            rb = rs_b[i]
+            # In PySyft, the AdditiveSharingTensor class will take care of the modulo
+            res = []
+            for j, r_a in enumerate(ra):
+                r_b = rb[j]
+                res.append(r_a ^ r_b)
+                # res.append((r_a + r_b) % (2 ** (eq.N * 8)))
+            results.append(res)
+        # todo: need to do the doc conversion
+        self.verify_bitmap_consistency()
+        return results
+
+    # the naive model will just send the indices to the server
+    def search_keywords_naive(self, keywords):
         self.verify_bitmap_consistency()
         # todo
         indices = []
@@ -286,6 +361,20 @@ class ODoryAccount(models.Model):
                     )
                 )
             )
+
+    def retrieve_doc_count(self):
+        uid, models = self.connect()
+        if not uid:
+            raise ValidationError(_("Connection Failed."))
+        count = models.execute_kw(
+            self.db,
+            uid,
+            self.password,
+            "res.users",
+            "get_indexed_document_count",
+            [[uid]],
+        )
+        return count
 
     # given raw files, we should upload to a partition
     # (randomly for now as it is out of the scope)
@@ -380,8 +469,6 @@ class ODoryAccount(models.Model):
         # should do the auto download thing
         return res
 
-    # prepare dpf secrets here and send to each partitions
-    # should not send all secrets to central server/master
     def search_keywords_indices(self, indices):
         uid, models = self.connect()
         if not uid:
@@ -393,6 +480,23 @@ class ODoryAccount(models.Model):
             "res.users",
             "search_documents_by_keyword_indices",
             [[uid], indices],
+        )
+
+        return res_ids
+
+    # prepare dpf secrets here and send to each partitions
+    # should not send all secrets to central server/master
+    def search_keywords(self, y, secrets):
+        uid, models = self.connect()
+        if not uid:
+            raise ValidationError(_("Connection Failed."))
+        res_ids = models.execute_kw(
+            self.db,
+            uid,
+            self.password,
+            "res.users",
+            "server_search",
+            [[uid], y, secrets],
         )
 
         return res_ids

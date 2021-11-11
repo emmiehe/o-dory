@@ -2,8 +2,12 @@ from odoo import api, fields, models, _
 from odoo.exceptions import UserError, ValidationError
 import json, random
 import logging
+import numpy as np
+import sycret
 
 _logger = logging.getLogger(__name__)
+
+eq = sycret.EqFactory(n_threads=6)
 
 
 class ResUsers(models.Model):
@@ -24,6 +28,10 @@ class ResUsers(models.Model):
     def get_bitmaps_version(self):
         __, __, version = self.get_folder()
         return version
+
+    def get_indexed_document_count(self):
+        folder_id, bitmaps, __ = self.get_folder()
+        return len(folder_id.bitmaps_deserialize(bitmaps))
 
     def upload_encrypted_files(self, encrypted_data):
         self.ensure_one()
@@ -171,3 +179,21 @@ class ResUsers(models.Model):
                     all_ret[j].append(row_to_doc.get(i))
 
         return all_ret
+
+    # server evals the secret
+    def server_search(self, y, secrets):
+        folder_id, bitmaps, version = self.get_folder()
+        bitmaps = folder_id.bitmaps_deserialize(bitmaps)
+        doc_count = len(bitmaps)
+        bloom_filter_k = folder_id.bitmap_width
+        # secrets = np.array(secrets, dtype=np.int64)
+        results = [[0 for x in range(doc_count)] for y in range(bloom_filter_k)]
+        for j, s in enumerate(secrets):
+            x, k = s
+            x = np.array(x, dtype=np.int32)
+            k = np.array(x, dtype=np.int32)
+            output = eq.eval(y, x, k)
+            output = output.tolist()
+            for i in range(doc_count):
+                results[j][i] ^= output[i] & list(bitmaps.values())[i][j]
+        return results

@@ -150,18 +150,24 @@ class ResUsers(models.Model):
         return [d.blob for d in doc_ids]
 
     # this is the naive model
-    def search_documents_by_keyword_indices(self, indices):
+    # all_indices = [[1, 2, 5], [9, 39, 4], [4, 7, 8]]
+    # should return [[doc id1, doc id2, ...], [], []]
+    def search_documents_by_keyword_indices(self, all_indices):
         self.ensure_one()
         # todo: the returned bitmaps should be deserialized?
         folder_id, bitmaps, version = self.get_folder()
         cols, row_to_doc = folder_id.bitmaps_flip(
             folder_id.bitmaps_deserialize(bitmaps)
         )
-        cols = [cols[i] for i in range(len(cols)) if i in indices]
-        ret = set()
-        for col in cols:
-            for i, row in enumerate(col):
-                if row:
-                    ret.add(row_to_doc.get(i))
+        all_ret = [[] for i in all_indices]
+        if not cols:
+            return all_ret
+        # i is row
+        for i in range(len(cols[0])):
+            # j is return slot
+            for j, indices in enumerate(all_indices):
+                # k is the actual index
+                if all([cols[k][i] for k in indices]):
+                    all_ret[j].append(row_to_doc.get(i))
 
-        return list(ret)
+        return all_ret

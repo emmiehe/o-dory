@@ -4,6 +4,7 @@ from odoo.exceptions import UserError, ValidationError
 from xmlrpc import client
 
 # import odoo.addons.decimal_precision as dp
+import mmh3
 import json, random, base64, re, string, hashlib
 
 
@@ -22,6 +23,7 @@ class ClientManager(models.Model):
     )
 
     bloom_filter_k = fields.Integer("Bitmap Width", default=255)  # 1 byte
+    hash_count = fields.Integer("Hash Count", default=3)
 
     def _get_salt(self):
         return "".join(random.choices(string.ascii_uppercase + string.digits, k=20))
@@ -34,22 +36,28 @@ class ClientManager(models.Model):
         res = re.findall("\w+", content)
         return res
 
-    # todo: implement this seriously
-    def compute_word_index(self, word):
+    def hash_word_to_indices(self, word):
         self.ensure_one()
-        res = (
-            int(hashlib.sha256((word + self.salt).encode()).hexdigest(), 16)
-            & self.bloom_filter_k
-        )
-        # print("~~~~~~~~~~~~~~ word: index", word, res)
-        return res
+        return [
+            mmh3.hash(word + self.salt, seed) % self.bloom_filter_k
+            for seed in range(self.hash_count)
+        ]
+
+    def compute_word_indices(self, word):
+        self.ensure_one()
+        # res = (
+        #     int(hashlib.sha256((word + self.salt).encode()).hexdigest(), 16)
+        #     & self.bloom_filter_k
+        # )
+        return self.hash_word_to_indices(word)
 
     def make_bloom_filter_row(self, keywords):
         self.ensure_one()
         res = [0] * self.bloom_filter_k
         for keyword in keywords:
-            i = self.compute_word_index(keyword)
-            res[i] = 1
+            indices = self.compute_word_indices(keyword)
+            for i in indices:
+                res[i] = 1
         return res
 
     # we don't really care about actual files for now
@@ -195,11 +203,15 @@ class ClientManager(models.Model):
     def search_keywords(self, keywords):
         self.verify_bitmap_consistency()
         # todo
-        indices = [self.compute_word_index(k) for k in keywords]
+        indices = []
+        for keyword in keywords:
+            indices.append(self.compute_word_indices(keyword))
+
         # print("search indices: ", indices)
         ids = set()
         for account in self.account_ids:
-            nids = set(account.search_keywords_indices(indices))
+            lst = [tuple(sorted(e)) for e in account.search_keywords_indices(indices)]
+            nids = set(lst)
             # print("result: ", nids, ids)
             if not ids:
                 ids = nids

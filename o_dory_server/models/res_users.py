@@ -184,6 +184,7 @@ class ResUsers(models.Model):
     def server_search(self, y, secrets):
         folder_id, bitmaps, version = self.get_folder()
         bitmaps = folder_id.bitmaps_deserialize(bitmaps)
+        cols, row_to_doc = folder_id.bitmaps_flip(bitmaps)
         doc_count = len(bitmaps)
         bloom_filter_k = folder_id.bitmap_width
         # secrets = np.array(secrets, dtype=np.int64)
@@ -191,9 +192,9 @@ class ResUsers(models.Model):
         for j, s in enumerate(secrets):
             x, k = s
             x = np.array(x, dtype=np.int32)
-            k = np.array(x, dtype=np.int32)
+            k = np.array(k, dtype=np.uint8)
             output = eq.eval(y, x, k)
             output = output.tolist()
             for i in range(doc_count):
-                results[j][i] ^= output[i] & list(bitmaps.values())[i][j]
-        return results
+                results[j][i] ^= output[i] & cols[j][i]
+        return results, list(row_to_doc.items())

@@ -255,10 +255,14 @@ class ClientManager(models.Model):
         for keyword in keywords:
             indices.extend(self.compute_word_indices(keyword))
 
+        print("keywords: indices ", keywords, indices)
+
         a, b = self.prepare_dpf(indices)
         account_a, account_b = self.account_ids[0], self.account_ids[1]
-        rs_a = account_a.search_keywords(0, a)
-        rs_b = account_b.search_keywords(1, b)
+        rs_a, row_to_doc = account_a.search_keywords(0, a)
+        rs_b, __ = account_b.search_keywords(1, b)
+        print(rs_a)
+        print(rs_b)
         # combining results
         results = []
         for i, ra in enumerate(rs_a):
@@ -271,8 +275,25 @@ class ClientManager(models.Model):
                 # res.append((r_a + r_b) % (2 ** (eq.N * 8)))
             results.append(res)
         # todo: need to do the doc conversion
+        # conveniently, the only valid columns are the indexed columns
+        results = [col for (i, col) in enumerate(results) if i in indices]
+
+        print(results)
+        row_to_doc = {int(k): v for (k, v) in row_to_doc}
+        print(row_to_doc)
+        # i is row
+        rows = []
+        for i in range(len(results[0])):
+            if all([results[k][i] for k in range(len(results))]):
+                rows.append(i)
+
+        print(rows)
+        docs = []
+        for row in rows:
+            docs.append(row_to_doc.get(row))
+
         self.verify_bitmap_consistency()
-        return results
+        return docs
 
     # the naive model will just send the indices to the server
     def search_keywords_naive(self, keywords):

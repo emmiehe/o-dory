@@ -55,6 +55,32 @@ class ClientManager(models.Model):
         # )
         return self.hash_word_to_indices(word)
 
+    def generate_doc_version(self):
+        return "".join(random.choices(string.ascii_uppercase + string.digits, k=32))
+
+    def get_mask_from_doc_version(self, version):
+        self.ensure_one()
+        mask = bin(int(hashlib.sha256((version + self.salt).encode()).hexdigest(), 16))[
+            2:
+        ]
+        print("~~~~ get mask from doc version:", version, mask)
+        return [int(m) for m in mask]
+
+    def unmask_indices(self, version, indices):
+        mask = self.get_mask_from_doc_version(version)
+        # todo:
+
+    # mask the given bloom filter with the given version
+    def mask_bloom_filter_row(self, bf_row, version):
+        mask = self.get_mask_from_doc_version(version)
+        curr = 0
+        for i in range(len(bf_row)):
+            if curr >= len(mask):
+                curr = 0
+            bf_row[i] ^= mask[curr]
+            curr += 1
+        return version
+
     def make_bloom_filter_row(self, keywords):
         self.ensure_one()
         res = [0] * self.bloom_filter_k
@@ -119,9 +145,11 @@ class ClientManager(models.Model):
             keywords = self.extract_keywords(rf)
             # print("--> keywords: ", keywords)
             row = self.make_bloom_filter_row(keywords)
+            version = self.generate_doc_version()
+            self.mask_bloom_filter_row(row, version)
             # print("--> bloom filter row: ", row)
             encrypted_file = self.encrypt(rf)
-            files.append(encrypted_file)
+            files.append([encrypted_file, version])
             rows.append(row)
             filenames.append(filename)
 
@@ -178,8 +206,10 @@ class ClientManager(models.Model):
         for new_raw_file in new_raw_files:
             keywords = self.extract_keywords(new_raw_file)
             row = self.make_bloom_filter_row(keywords)
+            version = self.generate_doc_version()
+            self.mask_bloom_filter_row(row, version)
             encrypted_file = self.encrypt(new_raw_file)
-            encrypted_files.append(encrypted_file)
+            encrypted_files.append([encrypted_file, version])
             rows.append(row)
 
         res_ids = None
@@ -259,8 +289,8 @@ class ClientManager(models.Model):
 
         a, b = self.prepare_dpf(indices)
         account_a, account_b = self.account_ids[0], self.account_ids[1]
-        rs_a, row_to_doc = account_a.search_keywords(0, a)
-        rs_b, __ = account_b.search_keywords(1, b)
+        rs_a, row_to_doc, doc_versions = account_a.search_keywords(0, a)
+        rs_b, __, __ = account_b.search_keywords(1, b)
         print(rs_a)
         print(rs_b)
         # combining results
@@ -279,12 +309,19 @@ class ClientManager(models.Model):
         results = [col for (i, col) in enumerate(results) if i in indices]
 
         print(results)
-        row_to_doc = {int(k): v for (k, v) in row_to_doc}
+        row_to_doc = {int(k): int(v) for (k, v) in row_to_doc}
+        # versions
+        versions = {e.get("id"): e.get("version") for e in doc_versions}
         print(row_to_doc)
+        print(versions)
         # i is row
         rows = []
         for i in range(len(results[0])):
-            if all([results[k][i] for k in range(len(results))]):
+            version = versions.get(row_to_doc.get(i))
+            mask = self.get_mask_from_doc_version(version)
+            mask = [mask[m] for m in indices]
+            print(mask)
+            if all([results[k][i] ^ mask[k] for k in range(len(results))]):
                 rows.append(i)
 
         print(rows)

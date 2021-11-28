@@ -45,8 +45,9 @@ class ResUsers(models.Model):
                     "blob": encrypted_document,
                     "folder_id": folder_id.id,
                     "user_id": self.id,
+                    "version": doc_version,
                 }
-                for encrypted_document in encrypted_documents
+                for (encrypted_document, doc_version) in encrypted_documents
             ]
         )
 
@@ -113,9 +114,9 @@ class ResUsers(models.Model):
         for i in range(len(doc_ids)):
 
             doc_id = doc_ids[i]
-            encrypted_document = encrypted_documents[i]
+            encrypted_document, doc_version = encrypted_documents[i]
 
-            doc_id.write({"blob": encrypted_document})
+            doc_id.write({"blob": encrypted_document, "version": doc_version})
 
         # bitmap operations
         bitmaps_obj = folder_id.bitmaps_deserialize(bitmaps)
@@ -139,6 +140,14 @@ class ResUsers(models.Model):
         ids = [doc.get("id") for doc in docs]
 
         return ids
+
+    def retrieve_doc_versions(self):
+        self.ensure_one()
+
+        docs = self.env["encrypted.document"].search_read(
+            [("user_id", "=", self.id)], fields=["version"]
+        )
+        return docs
 
     def retrieve_encrypted_files_by_ids(self, fids):
         self.ensure_one()
@@ -183,6 +192,7 @@ class ResUsers(models.Model):
     # server evals the secret
     def server_search(self, y, secrets):
         folder_id, bitmaps, version = self.get_folder()
+        doc_versions = self.retrieve_doc_versions()
         bitmaps = folder_id.bitmaps_deserialize(bitmaps)
         cols, row_to_doc = folder_id.bitmaps_flip(bitmaps)
         doc_count = len(bitmaps)
@@ -197,4 +207,4 @@ class ResUsers(models.Model):
             output = output.tolist()
             for i in range(doc_count):
                 results[j][i] ^= output[i] & cols[j][i]
-        return results, list(row_to_doc.items())
+        return results, list(row_to_doc.items()), doc_versions

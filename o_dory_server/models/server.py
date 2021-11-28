@@ -99,4 +99,4 @@ class EncryptedDocument(models.Model):
     blob = fields.Binary("Encrypted Blob")  # maybe this should be binary
     folder_id = fields.Many2one("server.folder", ondelete="restrict", string="Folder")
     user_id = fields.Many2one(related="folder_id.user_id")
-    version = fields.Integer("Version")
+    version = fields.Char("Version")

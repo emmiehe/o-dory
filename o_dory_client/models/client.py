@@ -55,7 +55,7 @@ class ClientManager(models.Model):
         # )
         # todo: handle hash collision?
         indices = self.hash_word_to_indices(word)
-        return sorted(list(set(indices))) 
+        return sorted(list(set(indices)))
 
     def generate_doc_version(self):
         return "".join(random.choices(string.ascii_uppercase + string.digits, k=12))
@@ -63,7 +63,7 @@ class ClientManager(models.Model):
     def get_mask_from_doc_version(self, version):
         self.ensure_one()
         mask = bin(int(hashlib.sha256((version + self.salt).encode()).hexdigest(), 16))[
-            2:2+self.bloom_filter_k
+            2 : 2 + self.bloom_filter_k
         ]
         # fake mask
         # mask = [0 for i in range(self.bloom_filter_k)]
@@ -287,9 +287,9 @@ class ClientManager(models.Model):
 
         # todo: for now only consider keywords is a list of one element
         # due to the wizard/frontend setup this is actually true
-        assert(len(keywords) == 1)
+        assert len(keywords) == 1
         indices = self.compute_word_indices(keywords[0])
-            
+
         print("keywords: indices ", keywords, indices)
 
         a, b = self.prepare_dpf(indices)
@@ -328,7 +328,7 @@ class ClientManager(models.Model):
             print("selected mask ", mask)
             unmasked = [results[k][i] ^ mask[k] for k in range(len(results))]
             print("unmasked ", unmasked)
-            # if all([results[k][i] for k in range(len(results))]):    
+            # if all([results[k][i] for k in range(len(results))]):
             if all(unmasked):
                 rows.append(i)
 

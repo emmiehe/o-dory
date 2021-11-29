@@ -40,7 +40,7 @@ def login_and_verify_access(url, db, username, password, target_models):
     return uid, models
 
 
-def run():
+def run(doc_num):
     url, db, username, password = URL, DB, USER, PW
     target_models = [
         "client.wizard",
@@ -57,7 +57,6 @@ def run():
     )
 
     manager_id = manager_id[0]
-    doc_num = 20
     msgs = [
         "".join(random.choices(string.ascii_uppercase + string.digits, k=10))
         for i in range(doc_num)
@@ -94,7 +93,7 @@ def run():
         db, uid, password, "client.wizard", "action_do_upload", [wizard_upload_id]
     )
 
-    logging.info("Searching all documents with search wizard")
+    logging.info("Searching keyword {} over all documents with search wizard".format(search_data[0][2].get("search_term")))
 
     wizard_search_id = models.execute_kw(
         db,
@@ -105,7 +104,7 @@ def run():
         [
             {
                 "manager_id": manager_id,
-                "data_ids": search_data,
+                "data_ids": search_data[:1],
             }
         ],
     )
@@ -135,8 +134,11 @@ def run():
         "document.record",
         "search_read",
         [[["manager_id", "=", manager_id]]],
-        {"fields": ["doc_id"]},
+        {"fields": ["doc_id", "name"]},
     )
+
+    for doc_id in doc_ids:
+        logging.info("{}:{}".format(doc_id.get("doc_id"), doc_id.get("name")))
 
     delete_data = []
     for doc in doc_ids:
@@ -164,4 +166,8 @@ def run():
 
 
 if __name__ == "__main__":
-    run()
+    doc_num = 100
+    if sys.argv[1:]:
+        doc_num = int(sys.argv[1])
+        
+    run(doc_num)

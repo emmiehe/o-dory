@@ -7,7 +7,7 @@ import sycret
 
 _logger = logging.getLogger(__name__)
 
-eq = sycret.EqFactory(n_threads=6)
+eq = sycret.EqFactory(n_threads=10)
 
 
 class ResUsers(models.Model):

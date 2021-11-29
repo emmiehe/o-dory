@@ -9,7 +9,7 @@ import numpy as np
 import sycret, random
 import json, random, base64, re, string, hashlib
 
-eq = sycret.EqFactory(n_threads=6)
+eq = sycret.EqFactory(n_threads=10)
 
 
 class ClientManager(models.Model):

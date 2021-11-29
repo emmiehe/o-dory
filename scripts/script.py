@@ -57,7 +57,7 @@ def run():
     )
 
     manager_id = manager_id[0]
-    doc_num = 10
+    doc_num = 20
     msgs = ["".join(random.choices(string.ascii_uppercase + string.digits, k=10)) for i in range(doc_num)]
     data = []
     search_data = []

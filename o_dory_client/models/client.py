@@ -53,16 +53,20 @@ class ClientManager(models.Model):
         #     int(hashlib.sha256((word + self.salt).encode()).hexdigest(), 16)
         #     & self.bloom_filter_k
         # )
-        return self.hash_word_to_indices(word)
+        # todo: handle hash collision?
+        indices = self.hash_word_to_indices(word)
+        return sorted(list(set(indices))) 
 
     def generate_doc_version(self):
-        return "".join(random.choices(string.ascii_uppercase + string.digits, k=32))
+        return "".join(random.choices(string.ascii_uppercase + string.digits, k=12))
 
     def get_mask_from_doc_version(self, version):
         self.ensure_one()
         mask = bin(int(hashlib.sha256((version + self.salt).encode()).hexdigest(), 16))[
-            2:
+            2:2+self.bloom_filter_k
         ]
+        # fake mask
+        # mask = [0 for i in range(self.bloom_filter_k)]
         print("~~~~ get mask from doc version:", version, mask)
         return [int(m) for m in mask]
 
@@ -72,13 +76,15 @@ class ClientManager(models.Model):
 
     # mask the given bloom filter with the given version
     def mask_bloom_filter_row(self, bf_row, version):
-        # mask = self.get_mask_from_doc_version(version)
-        # curr = 0
-        # for i in range(len(bf_row)):
-        #     if curr >= len(mask):
-        #         curr = 0
-        #     # bf_row[i] ^= mask[curr]
-        #     curr += 1
+        mask = self.get_mask_from_doc_version(version)
+        curr = 0
+        print("pre MASK:", bf_row)
+        for i in range(len(bf_row)):
+            if curr >= len(mask):
+                curr = 0
+            bf_row[i] ^= mask[curr]
+            curr += 1
+        print("post MASK:", bf_row)
         return version
 
     def make_bloom_filter_row(self, keywords):
@@ -281,18 +287,17 @@ class ClientManager(models.Model):
 
         # todo: for now only consider keywords is a list of one element
         # due to the wizard/frontend setup this is actually true
-        indices = []
-        for keyword in keywords:
-            indices.extend(self.compute_word_indices(keyword))
-
+        assert(len(keywords) == 1)
+        indices = self.compute_word_indices(keywords[0])
+            
         print("keywords: indices ", keywords, indices)
 
         a, b = self.prepare_dpf(indices)
         account_a, account_b = self.account_ids[0], self.account_ids[1]
         rs_a, row_to_doc, doc_versions = account_a.search_keywords(0, a)
         rs_b, __, __ = account_b.search_keywords(1, b)
-        print(rs_a)
-        print(rs_b)
+        # print(rs_a)
+        # print(rs_b)
         # combining results
         results = []
         for i, ra in enumerate(rs_a):
@@ -308,21 +313,23 @@ class ClientManager(models.Model):
         # conveniently, the only valid columns are the indexed columns
         results = [col for (i, col) in enumerate(results) if i in indices]
 
-        print(results)
+        print("filtered results ", results)
         row_to_doc = {int(k): int(v) for (k, v) in row_to_doc}
         # versions
         versions = {e.get("id"): e.get("version") for e in doc_versions}
-        print(row_to_doc)
-        print(versions)
+        print("row to doc ", row_to_doc)
+        print("versions ", versions)
         # i is row
         rows = []
         for i in range(len(results[0])):
             version = versions.get(row_to_doc.get(i))
-            # mask = self.get_mask_from_doc_version(version)
-            # mask = [mask[m] for m in indices]
-            # print(mask)
-            # if all([results[k][i] ^ mask[k] for k in range(len(results))]):
-            if all([results[k][i] for k in range(len(results))]):    
+            mask = self.get_mask_from_doc_version(version)
+            mask = [mask[m] for m in indices]
+            print("selected mask ", mask)
+            unmasked = [results[k][i] ^ mask[k] for k in range(len(results))]
+            print("unmasked ", unmasked)
+            # if all([results[k][i] for k in range(len(results))]):    
+            if all(unmasked):
                 rows.append(i)
 
         print(rows)

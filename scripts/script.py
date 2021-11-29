@@ -57,76 +57,82 @@ def run(doc_num):
     )
 
     manager_id = manager_id[0]
-    msgs = [
-        "".join(random.choices(string.ascii_uppercase + string.digits, k=10))
+
+    try:
+        msgs = [
+            "".join(random.choices(string.ascii_uppercase + string.digits, k=10))
         for i in range(doc_num)
-    ]
-    data = []
-    search_data = []
-    for msg in msgs:
-        data.append(
+        ]
+        data = []
+        search_data = []
+        for msg in msgs:
+            data.append(
+                [
+                    0,
+                    0,
+                    {"raw_file": base64.b64encode(msg.encode()).decode(), "filename": msg},
+                ]
+            )
+            search_data.append([0, 0, {"search_term": msg}])
+
+        logging.info("Uploading {} documents with upload wizard".format(doc_num))
+
+        wizard_upload_id = models.execute_kw(
+            db,
+            uid,
+            password,
+            "client.wizard",
+            "create",
             [
-                0,
-                0,
-                {"raw_file": base64.b64encode(msg.encode()).decode(), "filename": msg},
-            ]
+                {
+                    "manager_id": manager_id,
+                    "data_ids": data,
+                }
+            ],
         )
-        search_data.append([0, 0, {"search_term": msg}])
-
-    logging.info("Uploading {} documents with upload wizard".format(doc_num))
-
-    wizard_upload_id = models.execute_kw(
-        db,
-        uid,
-        password,
-        "client.wizard",
-        "create",
-        [
-            {
-                "manager_id": manager_id,
-                "data_ids": data,
-            }
-        ],
-    )
-
-    models.execute_kw(
-        db, uid, password, "client.wizard", "action_do_upload", [wizard_upload_id]
-    )
-
-    logging.info("Searching keyword {} over all documents with search wizard".format(search_data[0][2].get("search_term")))
-
-    wizard_search_id = models.execute_kw(
-        db,
-        uid,
-        password,
-        "client.wizard",
-        "create",
-        [
-            {
-                "manager_id": manager_id,
-                "data_ids": search_data[:1],
-            }
-        ],
-    )
-
-    models.execute_kw(
-        db, uid, password, "client.wizard", "action_do_search", [wizard_search_id]
-    )
-
-    res = models.execute_kw(
-        db,
-        uid,
-        password,
-        "client.data.wizard",
-        "search_read",
-        [[["wizard_id", "=", wizard_search_id]]],
-        {"fields": ["search_result"]},
-    )
-
-    logging.info("Search result {}".format(res))
-
+        
+        models.execute_kw(
+            db, uid, password, "client.wizard", "action_do_upload", [wizard_upload_id]
+        )
+        
+        logging.info("Searching keyword {} over all documents with search wizard".format(search_data[0][2].get("search_term")))
+        
+        wizard_search_id = models.execute_kw(
+            db,
+            uid,
+            password,
+            "client.wizard",
+            "create",
+            [
+                {
+                    "manager_id": manager_id,
+                    "data_ids": search_data[:1],
+                }
+            ],
+        )
+        
+        models.execute_kw(
+            db, uid, password, "client.wizard", "action_do_search", [wizard_search_id]
+        )
+        
+        res = models.execute_kw(
+            db,
+            uid,
+            password,
+            "client.data.wizard",
+            "search_read",
+            [[["wizard_id", "=", wizard_search_id]]],
+            {"fields": ["search_result"]},
+        )
+        
+        logging.info("Search result {}".format(res))
+        
+    except Exception:
+        logging.error("Error during uploading/searching")
+        pass
+        
     logging.info("Removing all documents")
-
+        
     doc_ids = models.execute_kw(
         db,
         uid,

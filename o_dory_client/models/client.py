@@ -26,7 +26,7 @@ class ClientManager(models.Model):
         help="Records for documents that are uploaded/updated from this client.",
     )
 
-    bloom_filter_k = fields.Integer("Bitmap Width", default=255)  # 1 byte
+    bloom_filter_k = fields.Integer("Bitmap Width", default=128)  # 1 byte
     hash_count = fields.Integer("Hash Count", default=3)
 
     def _get_salt(self):
@@ -72,13 +72,13 @@ class ClientManager(models.Model):
 
     # mask the given bloom filter with the given version
     def mask_bloom_filter_row(self, bf_row, version):
-        mask = self.get_mask_from_doc_version(version)
-        curr = 0
-        for i in range(len(bf_row)):
-            if curr >= len(mask):
-                curr = 0
-            bf_row[i] ^= mask[curr]
-            curr += 1
+        # mask = self.get_mask_from_doc_version(version)
+        # curr = 0
+        # for i in range(len(bf_row)):
+        #     if curr >= len(mask):
+        #         curr = 0
+        #     # bf_row[i] ^= mask[curr]
+        #     curr += 1
         return version
 
     def make_bloom_filter_row(self, keywords):
@@ -318,10 +318,11 @@ class ClientManager(models.Model):
         rows = []
         for i in range(len(results[0])):
             version = versions.get(row_to_doc.get(i))
-            mask = self.get_mask_from_doc_version(version)
-            mask = [mask[m] for m in indices]
-            print(mask)
-            if all([results[k][i] ^ mask[k] for k in range(len(results))]):
+            # mask = self.get_mask_from_doc_version(version)
+            # mask = [mask[m] for m in indices]
+            # print(mask)
+            # if all([results[k][i] ^ mask[k] for k in range(len(results))]):
+            if all([results[k][i] for k in range(len(results))]):    
                 rows.append(i)
 
         print(rows)

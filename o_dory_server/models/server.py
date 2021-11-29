@@ -17,7 +17,7 @@ class ServerFolder(models.Model):
     )
 
     bitmap_version = fields.Integer("Bitmap Version")
-    bitmap_width = fields.Integer("Bitmap Width", default=255)
+    bitmap_width = fields.Integer("Bitmap Width", default=128)
     bitmaps = fields.Binary("Bitmaps", attachment=False)
     # a field for display only
     bitmaps_str = fields.Char(

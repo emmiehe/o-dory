@@ -1,7 +1,7 @@
 from odoo import api, fields, models, _
 from odoo.exceptions import UserError, ValidationError
-import json, random
-import logging
+import ujson as json
+import logging, random
 import numpy as np
 import sycret
 
@@ -192,6 +192,7 @@ class ResUsers(models.Model):
     # server evals the secret
     def server_search(self, y, secrets):
         _logger.warning("Started server search")
+        secrets = json.loads(secrets)
         folder_id, bitmaps, version = self.get_folder()
         doc_versions = self.retrieve_doc_versions()
         bitmaps = folder_id.bitmaps_deserialize(bitmaps)

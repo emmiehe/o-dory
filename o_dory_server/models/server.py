@@ -3,7 +3,7 @@ from odoo import models, fields, api, _
 from odoo.exceptions import ValidationError
 
 # import odoo.addons.decimal_precision as dp
-import json
+import ujson as json
 
 
 # each user has a folder on the server

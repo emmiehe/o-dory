@@ -2,7 +2,7 @@
 import base64
 from odoo import models, fields, api, _
 from odoo.exceptions import ValidationError
-import json
+import ujson as json
 
 
 # wizard objects are deleted from the databaase

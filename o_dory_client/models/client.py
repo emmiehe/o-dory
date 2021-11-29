@@ -7,7 +7,8 @@ from xmlrpc import client
 import mmh3
 import numpy as np
 import sycret, random
-import json, random, base64, re, string, hashlib
+import random, base64, re, string, hashlib
+import ujson as json
 
 eq = sycret.EqFactory(n_threads=10)
 
@@ -275,6 +276,8 @@ class ClientManager(models.Model):
             a.append([x, keys_a.tolist()])
             b.append([x.copy(), keys_b.tolist()])
 
+        print("=== SHAPE ", len(a), len(a[0]), len(a[0][1]), len(a[0][1][0]))
+
         self.verify_bitmap_consistency()
         return a, b
 
@@ -294,8 +297,8 @@ class ClientManager(models.Model):
 
         a, b = self.prepare_dpf(indices)
         account_a, account_b = self.account_ids[0], self.account_ids[1]
-        rs_a, row_to_doc, doc_versions = account_a.search_keywords(0, a)
-        rs_b, __, __ = account_b.search_keywords(1, b)
+        rs_a, row_to_doc, doc_versions = account_a.search_keywords(0, json.dumps(a))
+        rs_b, __, __ = account_b.search_keywords(1, json.dumps(b))
         # print(rs_a)
         # print(rs_b)
         # combining results

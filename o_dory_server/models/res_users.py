@@ -191,6 +191,7 @@ class ResUsers(models.Model):
 
     # server evals the secret
     def server_search(self, y, secrets):
+        _logger.warning("Started server search")
         folder_id, bitmaps, version = self.get_folder()
         doc_versions = self.retrieve_doc_versions()
         bitmaps = folder_id.bitmaps_deserialize(bitmaps)
@@ -207,4 +208,5 @@ class ResUsers(models.Model):
             output = output.tolist()
             for i in range(doc_count):
                 results[j][i] ^= output[i] & cols[j][i]
+        _logger.warning("Done server search")
         return results, list(row_to_doc.items()), doc_versions

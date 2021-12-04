@@ -104,7 +104,7 @@ class ClientManager(models.Model):
                 ).hexdigest(),
                 16,
             )
-            % 12
+            % 256
         )
         return mac
 

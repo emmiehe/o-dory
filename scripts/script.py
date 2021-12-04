@@ -150,8 +150,8 @@ def run(doc_num):
         {"fields": ["doc_id", "name"]},
     )
 
-    for doc_id in doc_ids:
-        logging.info("{}:{}".format(doc_id.get("doc_id"), doc_id.get("name")))
+    # for doc_id in doc_ids:
+    #     logging.info("{}:{}".format(doc_id.get("doc_id"), doc_id.get("name")))
 
     delete_data = []
     for doc in doc_ids:

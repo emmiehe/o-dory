@@ -258,5 +258,5 @@ class ResUsers(models.Model):
                 results[j][i] ^= output[i] & cols[j][i]
         _logger.warning("Done server search")
 
-        # return json.dumps((results, list(row_to_doc.items()), doc_versions))
-        return results, list(row_to_doc.items()), doc_versions
+        # return results, list(row_to_doc.items()), doc_versions
+        return json.dumps((results, list(row_to_doc.items()), doc_versions))

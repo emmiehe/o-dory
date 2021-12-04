@@ -375,8 +375,8 @@ class ClientManager(models.Model):
         search_data_a = account_a.search_keywords(0, json.dumps(a))
         search_data_b = account_b.search_keywords(1, json.dumps(b))
 
-        rs_a, row_to_doc, doc_versions = search_data_a  # json.loads(search_data_a)
-        rs_b, __, __ = search_data_b  # json.loads(search_data_b)
+        rs_a, row_to_doc, doc_versions = json.loads(search_data_a)
+        rs_b, __, __ = json.loads(search_data_b)
         # print(rs_a)
         # print(rs_b)
         # combining results

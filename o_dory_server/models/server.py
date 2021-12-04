@@ -19,10 +19,25 @@ class ServerFolder(models.Model):
     bitmap_version = fields.Integer("Bitmap Version")
     bitmap_width = fields.Integer("Bitmap Width", default=128)
     bitmaps = fields.Binary("Bitmaps", attachment=False)
+
+    # for authentication purposes
+    # this is a list of mac, each mac represents a column from the bitmap
+    col_macs = fields.Binary("MACs", attachment=False)
+
     # a field for display only
     bitmaps_str = fields.Char(
         "Bitmaps String", compute="_compute_bitmaps_str", store=True
     )  # this field should be removed later
+
+    def col_macs_create(self):
+        self.ensure_one()
+        return [0 for i in range(self.bitmap_width)]
+
+    def col_macs_serialize(self, col_macs_obj):
+        return json.dumps(col_macs_obj)
+
+    def col_macs_deserialize(self, col_macs_serialized):
+        return json.loads(col_macs_serialized)
 
     # we need some bitmaps operations
     # for now the bitmaps is a dictionary,
@@ -64,6 +79,9 @@ class ServerFolder(models.Model):
             bitmaps_obj[doc_id] = rows[i]
         return bitmaps_obj
 
+    def bitmaps_get(self, bitmaps_obj, doc_ids):
+        return [bitmaps_obj.get(str(doc_id)) for doc_id in doc_ids]
+
     def bitmaps_remove(self, bitmaps_obj, doc_ids):
         count, removed = len(doc_ids), 0
         for doc_id in doc_ids:
@@ -87,6 +105,7 @@ class ServerFolder(models.Model):
         # when a server folder is created, there should be a bitmap table setup
         for res_id in res_ids:
             res_id.bitmaps = res_id.bitmaps_serialize(res_id.bitmaps_create())
+            res_id.col_macs = res_id.col_macs_serialize(res_id.col_macs_create())
         return res_ids
 
 

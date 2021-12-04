@@ -61,7 +61,7 @@ def run(doc_num):
     try:
         msgs = [
             "".join(random.choices(string.ascii_uppercase + string.digits, k=10))
-        for i in range(doc_num)
+            for i in range(doc_num)
         ]
         data = []
         search_data = []
@@ -70,7 +70,10 @@ def run(doc_num):
                 [
                     0,
                     0,
-                    {"raw_file": base64.b64encode(msg.encode()).decode(), "filename": msg},
+                    {
+                        "raw_file": base64.b64encode(msg.encode()).decode(),
+                        "filename": msg,
+                    },
                 ]
             )
             search_data.append([0, 0, {"search_term": msg}])
@@ -90,13 +93,17 @@ def run(doc_num):
                 }
             ],
         )
-        
+
         models.execute_kw(
             db, uid, password, "client.wizard", "action_do_upload", [wizard_upload_id]
         )
-        
-        logging.info("Searching keyword {} over all documents with search wizard".format(search_data[0][2].get("search_term")))
-        
+
+        logging.info(
+            "Searching keyword {} over all documents with search wizard".format(
+                search_data[0][2].get("search_term")
+            )
+        )
+
         wizard_search_id = models.execute_kw(
             db,
             uid,
@@ -110,11 +117,11 @@ def run(doc_num):
                 }
             ],
         )
-        
+
         models.execute_kw(
             db, uid, password, "client.wizard", "action_do_search", [wizard_search_id]
         )
-        
+
         res = models.execute_kw(
             db,
             uid,
@@ -124,15 +131,15 @@ def run(doc_num):
             [[["wizard_id", "=", wizard_search_id]]],
             {"fields": ["search_result"]},
         )
-        
+
         logging.info("Search result {}".format(res))
-        
+
     except Exception:
         logging.error("Error during uploading/searching")
         pass
-        
+
     logging.info("Removing all documents")
-        
+
     doc_ids = models.execute_kw(
         db,
         uid,
@@ -175,5 +182,5 @@ if __name__ == "__main__":
     doc_num = 100
     if sys.argv[1:]:
         doc_num = int(sys.argv[1])
-        
+
     run(doc_num)

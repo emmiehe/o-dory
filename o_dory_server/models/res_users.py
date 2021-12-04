@@ -25,6 +25,24 @@ class ResUsers(models.Model):
         bitmaps = folder_id.bitmaps
         return folder_id, bitmaps, version
 
+    def get_bitmaps_doc_versions_by_doc_ids(self, doc_ids):
+        self.ensure_one()
+        folder_id, bitmaps, version = self.get_folder()
+        docs = self.env["encrypted.document"].search_read(
+            [
+                ("user_id", "=", self.id),
+                ("folder_id", "=", folder_id.id),
+                ("id", "in", doc_ids),
+            ],
+            fields=["version"],
+        )
+        doc_versions = {doc.get("id"): doc.get("version") for doc in docs}
+        bitmaps = folder_id.bitmaps_get(folder_id.bitmaps_deserialize(bitmaps), doc_ids)
+        ret = [
+            [bitmaps[i], doc_versions.get(doc_ids[i])] for i in range(len(doc_versions))
+        ]
+        return json.dumps(ret)
+
     def get_bitmaps_version(self):
         __, __, version = self.get_folder()
         return version
@@ -35,7 +53,7 @@ class ResUsers(models.Model):
 
     def upload_encrypted_files(self, encrypted_data):
         self.ensure_one()
-        encrypted_documents, bloom_filter_rows = encrypted_data
+        encrypted_documents, bloom_filter_rows, new_col_macs = encrypted_data
         folder_id, bitmaps, version = self.get_folder()
 
         # upload the encrypted_document
@@ -63,42 +81,55 @@ class ResUsers(models.Model):
         )
         new_bitmaps = folder_id.bitmaps_serialize(bitmaps_obj)
 
-        folder_id.sudo().write({"bitmaps": new_bitmaps, "bitmap_version": version + 1})
+        folder_id.sudo().write(
+            {
+                "bitmaps": new_bitmaps,
+                "bitmap_version": version + 1,
+                "col_macs": new_col_macs,
+            }
+        )
 
         return doc_ids.ids
 
-    def remove_encrypted_files_by_ids(self, fids):
+    def remove_encrypted_files_by_ids(self, data):
         self.ensure_one()
         folder_id, bitmaps, version = self.get_folder()
+        fids, new_col_macs = data
 
         # iterate over doc_ids to avoid deleting files not belonging to the user
         doc_ids = self.env["encrypted.document"].search(
             [("id", "in", fids), ("user_id", "=", self.id)]
         )
 
-        if len(doc_ids) < len(fids):
-            _logger.warning(
-                "User {} attempts to delete non-existent files {}".format(self.id, fids)
-            )
-
+        res = True
         if doc_ids:
+            if set(doc_ids.ids) != set(fids):
+                _logger.warning(
+                    "User {} attempts to delete non-existent files {}".format(
+                        self.id, fids
+                    )
+                )
+                return False
+
             ddoc_ids = [str(i) for i in doc_ids.ids]
             doc_ids.unlink()
             # deserialize
             bitmaps_obj = folder_id.bitmaps_deserialize(bitmaps)
-
             res = folder_id.bitmaps_remove(bitmaps_obj, ddoc_ids)
-
             new_bitmaps = folder_id.bitmaps_serialize(bitmaps_obj)
 
             folder_id.sudo().write(
-                {"bitmaps": new_bitmaps, "bitmap_version": version + 1}
+                {
+                    "bitmaps": new_bitmaps,
+                    "bitmap_version": version + 1,
+                    "col_macs": new_col_macs,
+                }
             )
 
-        return True
+        return res
 
     def update_files_by_ids(self, encrypted_data):
-        fids, encrypted_documents, bloom_filter_rows = encrypted_data
+        fids, encrypted_documents, bloom_filter_rows, new_col_macs = encrypted_data
         folder_id, bitmaps, version = self.get_folder()
 
         # verify the old file exists
@@ -125,7 +156,13 @@ class ResUsers(models.Model):
         )
         new_bitmaps = folder_id.bitmaps_serialize(bitmaps_obj)
 
-        folder_id.sudo().write({"bitmaps": new_bitmaps, "bitmap_version": version + 1})
+        folder_id.sudo().write(
+            {
+                "bitmaps": new_bitmaps,
+                "bitmap_version": version + 1,
+                "col_macs": new_col_macs,
+            }
+        )
 
         return True
 
@@ -148,6 +185,17 @@ class ResUsers(models.Model):
             [("user_id", "=", self.id)], fields=["version"]
         )
         return docs
+
+    def retrieve_col_macs(self):
+        self.ensure_one()
+
+        folders = self.env["server.folder"].search_read(
+            [("user_id", "=", self.id)], fields=["col_macs"]
+        )
+
+        col_macs = [folder.get("col_macs") for folder in folders]
+
+        return col_macs[0]  # this is already serialized
 
     def retrieve_encrypted_files_by_ids(self, fids):
         self.ensure_one()
@@ -199,7 +247,6 @@ class ResUsers(models.Model):
         cols, row_to_doc = folder_id.bitmaps_flip(bitmaps)
         doc_count = len(bitmaps)
         bloom_filter_k = folder_id.bitmap_width
-        # secrets = np.array(secrets, dtype=np.int64)
         results = [[0 for x in range(doc_count)] for y in range(bloom_filter_k)]
         for j, s in enumerate(secrets):
             x, k = s
@@ -210,4 +257,6 @@ class ResUsers(models.Model):
             for i in range(doc_count):
                 results[j][i] ^= output[i] & cols[j][i]
         _logger.warning("Done server search")
+
+        # return json.dumps((results, list(row_to_doc.items()), doc_versions))
         return results, list(row_to_doc.items()), doc_versions

@@ -27,7 +27,9 @@ class ClientManager(models.Model):
         help="Records for documents that are uploaded/updated from this client.",
     )
 
-    bloom_filter_k = fields.Integer("Bitmap Width", default=128)  # 1 byte
+    bloom_filter_k = fields.Integer(
+        "Bitmap Width", default=128
+    )  # this is actually bloom_filter width
     hash_count = fields.Integer("Hash Count", default=3)
 
     def _get_salt(self):
@@ -71,9 +73,14 @@ class ClientManager(models.Model):
         print("~~~~ get mask from doc version:", version, mask)
         return [int(m) for m in mask]
 
-    def unmask_indices(self, version, indices):
-        mask = self.get_mask_from_doc_version(version)
-        # todo:
+    def make_bloom_filter_row(self, keywords):
+        self.ensure_one()
+        res = [0] * self.bloom_filter_k
+        for keyword in keywords:
+            indices = self.compute_word_indices(keyword)
+            for i in indices:
+                res[i] = 1
+        return res
 
     # mask the given bloom filter with the given version
     def mask_bloom_filter_row(self, bf_row, version):
@@ -88,13 +95,28 @@ class ClientManager(models.Model):
         print("post MASK:", bf_row)
         return version
 
-    def make_bloom_filter_row(self, keywords):
+    def generate_mac(self, bit, index, doc_version):
         self.ensure_one()
-        res = [0] * self.bloom_filter_k
-        for keyword in keywords:
-            indices = self.compute_word_indices(keyword)
-            for i in indices:
-                res[i] = 1
+        mac = (
+            int(
+                hashlib.sha256(
+                    (str(bit) + str(index) + doc_version + self.salt).encode()
+                ).hexdigest(),
+                16,
+            )
+            % 12
+        )
+        return mac
+
+    def generate_macs(self, bf_row, doc_version):
+        # given a (masked) bf_row
+        # generate an array of macs
+        self.ensure_one()
+        res = []
+        for i in range(self.bloom_filter_k):
+            # salt is per client manager (so effectively per folder)
+            mac = self.generate_mac(bf_row[i], i, doc_version)
+            res.append(mac)
         return res
 
     # we don't really care about actual files for now
@@ -128,8 +150,34 @@ class ClientManager(models.Model):
             )
 
         versions = [a.retrieve_bitmaps_version() for a in self.account_ids]
-        print("bitmaps versions -----> ", versions)
-        return all(v == versions[0] for v in versions)
+        # print("bitmaps versions -----> ", versions)
+        if not all(v == versions[0] for v in versions):
+            raise ValidationError(_("bitmaps versions don't match"))
+
+    def verify_and_retrieve_current_macs(self):
+        old_macs_lst = [account.retrieve_col_macs() for account in self.account_ids]
+        if not all(om == old_macs_lst[0] for om in old_macs_lst):
+            raise ValidationError(_("MACs don't match"))
+
+        old_macs = old_macs_lst[0]
+
+        return old_macs
+
+    def verify_and_compute_macs_for_doc_ids(self, doc_ids):
+        macs = [
+            account.compute_macs_for_doc_ids(doc_ids) for account in self.account_ids
+        ]
+        if not all(m == macs[0] for m in macs):
+            raise ValidationError(_("Selected computed MACs don't match"))
+        return macs[0]
+
+    def update_col_macs(self, old_macs, new_macs):
+        self.ensure_one()
+        print("update col macs", old_macs, new_macs)
+        new_macs = [old_macs[i] ^ new_macs[i] for i in range(self.bloom_filter_k)]
+        # macs needs to be serialized
+        updated_macs = json.dumps(new_macs)
+        return updated_macs
 
     def get_doc_count(self):
         self.ensure_one()
@@ -147,13 +195,20 @@ class ClientManager(models.Model):
     def upload(self, raw_data):
         self.verify_bitmap_consistency()
 
-        files, rows, filenames = [], [], []
+        old_macs = self.verify_and_retrieve_current_macs()
+
+        files, rows, filenames, macs = [], [], [], []
         for rf, filename in raw_data:
             keywords = self.extract_keywords(rf)
             # print("--> keywords: ", keywords)
             row = self.make_bloom_filter_row(keywords)
             version = self.generate_doc_version()
             self.mask_bloom_filter_row(row, version)
+            mac = self.generate_macs(row, version)
+            if not macs:
+                macs = mac
+            else:
+                macs = [macs[i] ^ mac[i] for i in range(len(mac))]
             # print("--> bloom filter row: ", row)
             encrypted_file = self.encrypt(rf)
             files.append([encrypted_file, version])
@@ -163,7 +218,9 @@ class ClientManager(models.Model):
         if not files:
             return []
 
-        data = [files, rows]
+        macs = self.update_col_macs(old_macs, macs)
+
+        data = [files, rows, macs]
         # print("-----> data", data)
         res_ids = None
         for account in self.account_ids:
@@ -191,8 +248,13 @@ class ClientManager(models.Model):
     def remove(self, fids):
         self.verify_bitmap_consistency()
         res = False
+        old_macs = self.verify_and_retrieve_current_macs()
+        # compute selected files macs
+        new_macs = self.verify_and_compute_macs_for_doc_ids(fids)
+        macs = self.update_col_macs(old_macs, new_macs)
+
         for account in self.account_ids:
-            res = account.remove(fids)
+            res = account.remove([fids, macs])
             if not res:
                 raise ValidationError(_("Inconsistent removing."))
 
@@ -208,20 +270,31 @@ class ClientManager(models.Model):
     # updating old file with the new raw file
     def update(self, fids, new_raw_files):
         self.verify_bitmap_consistency()
+        old_macs = self.verify_and_retrieve_current_macs()
 
-        encrypted_files, rows = [], []
+        encrypted_files, rows, macs = [], [], []
         for new_raw_file in new_raw_files:
             keywords = self.extract_keywords(new_raw_file)
             row = self.make_bloom_filter_row(keywords)
             version = self.generate_doc_version()
             self.mask_bloom_filter_row(row, version)
+            mac = self.generate_macs(row, version)
+            if not macs:
+                macs = mac
+            else:
+                macs = [macs[i] ^ mac[i] for i in range(len(mac))]
+
             encrypted_file = self.encrypt(new_raw_file)
             encrypted_files.append([encrypted_file, version])
             rows.append(row)
 
         res_ids = None
+        remove_macs = self.verify_and_compute_macs_for_doc_ids(fids)
+        macs = [remove_macs[i] ^ macs[i] for i in range(len(macs))]
+        macs = self.update_col_macs(old_macs, macs)
+        data = [fids, encrypted_files, rows, macs]
         for account in self.account_ids:
-            doc_ids = account.update(fids, encrypted_files, rows)
+            doc_ids = account.update(data)
             if res_ids == None:
                 res_ids = doc_ids
             if res_ids != doc_ids:
@@ -288,6 +361,8 @@ class ClientManager(models.Model):
         if len(self.account_ids) != 2:
             raise ValidationError(_("Need exactly two servers for searching."))
 
+        server_macs = self.verify_and_retrieve_current_macs()
+
         # todo: for now only consider keywords is a list of one element
         # due to the wizard/frontend setup this is actually true
         assert len(keywords) == 1
@@ -297,8 +372,11 @@ class ClientManager(models.Model):
 
         a, b = self.prepare_dpf(indices)
         account_a, account_b = self.account_ids[0], self.account_ids[1]
-        rs_a, row_to_doc, doc_versions = account_a.search_keywords(0, json.dumps(a))
-        rs_b, __, __ = account_b.search_keywords(1, json.dumps(b))
+        search_data_a = account_a.search_keywords(0, json.dumps(a))
+        search_data_b = account_b.search_keywords(1, json.dumps(b))
+
+        rs_a, row_to_doc, doc_versions = search_data_a  # json.loads(search_data_a)
+        rs_b, __, __ = search_data_b  # json.loads(search_data_b)
         # print(rs_a)
         # print(rs_b)
         # combining results
@@ -318,8 +396,28 @@ class ClientManager(models.Model):
 
         print("filtered results ", results)
         row_to_doc = {int(k): int(v) for (k, v) in row_to_doc}
+
         # versions
         versions = {e.get("id"): e.get("version") for e in doc_versions}
+        # now we need to check if the returned columns match our macs
+        for col, i in enumerate(indices):
+            macs = [
+                self.generate_mac(
+                    results[col][row], i, versions.get(row_to_doc.get(row))
+                )
+                for row in range(len(results[col]))
+            ]
+            print("col macs", macs)
+            m = None
+            for mac in macs:
+                if m == None:
+                    m = mac
+                else:
+                    m ^= mac
+            print("comparing mac", m, server_macs[i])
+            if m != server_macs[i]:
+                raise ValidationError(_("MACs don't match. Server could be corrupted."))
+
         print("row to doc ", row_to_doc)
         print("versions ", versions)
         # i is row
@@ -335,12 +433,13 @@ class ClientManager(models.Model):
             if all(unmasked):
                 rows.append(i)
 
-        print(rows)
+        # print(rows)
         docs = []
         for row in rows:
             docs.append(row_to_doc.get(row))
 
         self.verify_bitmap_consistency()
+        print("----------------- done searching from server", docs)
         return docs
 
     # the naive model will just send the indices to the server
@@ -445,6 +544,47 @@ class ODoryAccount(models.Model):
         )
         return count
 
+    def retrieve_col_macs(self):
+        uid, models = self.connect()
+        if not uid:
+            raise ValidationError(_("Connection Failed."))
+
+        col_macs_json = models.execute_kw(
+            self.db, uid, self.password, "res.users", "retrieve_col_macs", [[uid]]
+        )
+        print(col_macs_json)
+        if not col_macs_json:
+            return [0 for i in range(self.manager_id.bloom_filter_k)]
+        col_macs = json.loads(col_macs_json)
+        return col_macs
+
+    def compute_macs_for_doc_ids(self, doc_ids):
+        uid, models = self.connect()
+        if not uid:
+            raise ValidationError(_("Connection Failed."))
+
+        serialized_bitmaps_doc_versions = models.execute_kw(
+            self.db,
+            uid,
+            self.password,
+            "res.users",
+            "get_bitmaps_doc_versions_by_doc_ids",
+            [[uid], doc_ids],
+        )
+        bitmaps_doc_versions = json.loads(serialized_bitmaps_doc_versions)
+        macs_lst = [
+            self.manager_id.generate_macs(bitmap, version)
+            for (bitmap, version) in bitmaps_doc_versions
+        ]
+        macs = []
+        for m in macs_lst:
+            if not macs:
+                macs = m
+            else:
+                macs = [macs[i] ^ m[i] for i in range(len(m))]
+        print("compute macs for doc ids", macs)
+        return macs
+
     # given raw files, we should upload to a partition
     # (randomly for now as it is out of the scope)
     # we also should add a row to every partition's bitmaps
@@ -468,26 +608,31 @@ class ODoryAccount(models.Model):
 
     # given document ids, we should remove the file from the server
     # the corresponding bitmaps row also need to be removed
-    def remove(self, fids):
+    def remove(self, data):
+        if not data:
+            return False
+
         uid, models = self.connect()
         if not uid:
             raise ValidationError(_("Connection Failed."))
-        if fids:
-            res = models.execute_kw(
-                self.db,
-                uid,
-                self.password,
-                "res.users",
-                "remove_encrypted_files_by_ids",
-                [[uid], fids],
-            )
 
-            return res
+        res = models.execute_kw(
+            self.db,
+            uid,
+            self.password,
+            "res.users",
+            "remove_encrypted_files_by_ids",
+            [[uid], data],
+        )
 
-        return False
+        return res
 
     # updating old file with the new raw file
-    def update(self, fids, encrypted_files, rows):
+    def update(self, data):
+        fids, encrypted_files, rows, new_macs = data
+        if not fids or not (len(fids) == len(encrypted_files) == len(rows)):
+            return False
+
         uid, models = self.connect()
         if not uid:
             raise ValidationError(_("Connection Failed."))
@@ -498,7 +643,7 @@ class ODoryAccount(models.Model):
             self.password,
             "res.users",
             "update_files_by_ids",
-            [[uid], [fids, encrypted_files, rows]],
+            [[uid], data],
         )
         return res
 
@@ -518,7 +663,7 @@ class ODoryAccount(models.Model):
 
         return ids
 
-    # retrive documents by ids
+    # retrieve documents by ids
     def retrieve_files(self, fids):  # a list of fid
         uid, models = self.connect()
         if not uid:

@@ -9,6 +9,7 @@ import numpy as np
 import sycret, random
 import random, base64, re, string, hashlib
 import ujson as json
+import concurrent.futures
 
 eq = sycret.EqFactory(n_threads=10)
 
@@ -68,8 +69,8 @@ class ClientManager(models.Model):
             mask.extend(mask)
         # fake mask
         # mask = [0 for i in range(self.bloom_filter_k)]
-        print("~~~~ get mask from doc version:", version, mask)
-        return mask[:self.bloom_filter_k]
+        # print("~~~~ get mask from doc version:", version, mask)
+        return mask[: self.bloom_filter_k]
 
     def make_bloom_filter_row(self, keywords):
         self.ensure_one()
@@ -84,13 +85,13 @@ class ClientManager(models.Model):
     def mask_bloom_filter_row(self, bf_row, version):
         mask = self.get_mask_from_doc_version(version)
         curr = 0
-        print("pre MASK:", bf_row)
+        # print("pre MASK:", bf_row)
         for i in range(len(bf_row)):
             if curr >= len(mask):
                 curr = 0
             bf_row[i] ^= mask[curr]
             curr += 1
-        print("post MASK:", bf_row)
+        # print("post MASK:", bf_row)
         return version
 
     def generate_mac(self, bit, index, doc_version):
@@ -148,7 +149,7 @@ class ClientManager(models.Model):
             )
 
         versions = [a.retrieve_bitmaps_version() for a in self.account_ids]
-        # print("bitmaps versions -----> ", versions)
+        # # print("bitmaps versions -----> ", versions)
         if not all(v == versions[0] for v in versions):
             raise ValidationError(_("bitmaps versions don't match"))
 
@@ -174,7 +175,7 @@ class ClientManager(models.Model):
 
     def update_col_macs(self, old_macs, new_macs):
         self.ensure_one()
-        print("update col macs", old_macs, new_macs)
+        # print("update col macs", old_macs, new_macs)
         new_macs = [old_macs[i] ^ new_macs[i] for i in range(self.bloom_filter_k)]
         # macs needs to be serialized
         updated_macs = json.dumps(new_macs)
@@ -188,7 +189,7 @@ class ClientManager(models.Model):
             )
 
         counts = [a.retrieve_doc_count() for a in self.account_ids]
-        print("counts -----> ", counts)
+        # print("counts -----> ", counts)
         if not all(c == counts[0] for c in counts):
             raise ValidationError(_("Inconsistent doc counts."))
         return counts[0]
@@ -201,7 +202,7 @@ class ClientManager(models.Model):
         files, rows, filenames, macs = [], [], [], []
         for rf, filename in raw_data:
             keywords = self.extract_keywords(rf)
-            # print("--> keywords: ", keywords)
+            # # print("--> keywords: ", keywords)
             row = self.make_bloom_filter_row(keywords)
             version = self.generate_doc_version()
             self.mask_bloom_filter_row(row, version)
@@ -210,7 +211,7 @@ class ClientManager(models.Model):
                 macs = mac
             else:
                 macs = [macs[i] ^ mac[i] for i in range(len(mac))]
-            # print("--> bloom filter row: ", row)
+            # # print("--> bloom filter row: ", row)
             encrypted_file = self.encrypt(rf)
             files.append([encrypted_file, version])
             rows.append(row)
@@ -222,7 +223,7 @@ class ClientManager(models.Model):
         macs = self.update_col_macs(old_macs, macs)
 
         data = [files, rows, macs]
-        # print("-----> data", data)
+        # # print("-----> data", data)
         res_ids = None
         for account in self.account_ids:
             doc_ids = account.upload(data)
@@ -345,12 +346,12 @@ class ClientManager(models.Model):
                     r = random.randint(-100, 100)
                     x[k] += r if r else 10  # avoid not adding anything
 
-            # print(x)
+            # # print(x)
             x = x.tolist()
             a.append([x, keys_a.tolist()])
             b.append([x.copy(), keys_b.tolist()])
 
-        print("=== SHAPE ", len(a), len(a[0]), len(a[0][1]), len(a[0][1][0]))
+        # print("=== SHAPE ", len(a), len(a[0]), len(a[0][1]), len(a[0][1][0]))
 
         self.verify_bitmap_consistency()
         return a, b
@@ -369,16 +370,31 @@ class ClientManager(models.Model):
         assert len(keywords) == 1
         indices = self.compute_word_indices(keywords[0])
 
-        print("keywords: indices ", keywords, indices)
+        # print("keywords: indices ", keywords, indices)
 
-        a, b = self.prepare_dpf(indices)
-        account_a, account_b = self.account_ids[0], self.account_ids[1]
-        search_data_a = account_a.search_keywords(0, json.dumps(a))
-        search_data_b = account_b.search_keywords(1, json.dumps(b))
+        # a, b = self.prepare_dpf(indices)
+        # account_a, account_b = self.account_ids[0], self.account_ids[1]
+
+        # search_data_a = account_a.search_keywords(0, json.dumps(a))
+        # search_data_b = account_b.search_keywords(1, json.dumps(b))
+
+        params = self.prepare_dpf(indices)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+            futures = [
+                executor.submit(
+                    ODoryAccount.search_keywords,
+                    self.account_ids[i],
+                    i,
+                    json.dumps(params[i]),
+                )
+                for i in range(2)
+            ]
+
+        search_data_a, search_data_b = [f.result() for f in futures]
 
         rs_a, row_to_doc, doc_versions = json.loads(search_data_a)
         rs_b, __, __ = json.loads(search_data_b)
-        # print(rs_a)
+        # # print(rs_a)
         # print(rs_b)
         # combining results
         results = []
@@ -395,7 +411,7 @@ class ClientManager(models.Model):
         # conveniently, the only valid columns are the indexed columns
         results = [col for (i, col) in enumerate(results) if i in indices]
 
-        print("filtered results ", results)
+        # print("filtered results ", results)
         row_to_doc = {int(k): int(v) for (k, v) in row_to_doc}
 
         # versions
@@ -408,18 +424,18 @@ class ClientManager(models.Model):
                 )
                 for row in range(len(results[col]))
             ]
-            print("col macs", macs)
+            # print("col macs", macs)
             m = None
             for mac in macs:
                 if m == None:
                     m = mac
                 else:
                     m ^= mac
-            print("comparing mac", m, server_macs[i])
+            # print("comparing mac", m, server_macs[i])
             if m != server_macs[i]:
                 raise ValidationError(_("MACs don't match. Server could be corrupted."))
 
-        print("row to doc ", row_to_doc)
+        # print("row to doc ", row_to_doc)
         print("versions ", versions)
         # i is row
         rows = []
@@ -427,20 +443,20 @@ class ClientManager(models.Model):
             version = versions.get(row_to_doc.get(i))
             mask = self.get_mask_from_doc_version(version)
             mask = [mask[m] for m in indices]
-            print("selected mask ", mask)
+            # print("selected mask ", mask)
             unmasked = [results[k][i] ^ mask[k] for k in range(len(results))]
-            print("unmasked ", unmasked)
+            # print("unmasked ", unmasked)
             # if all([results[k][i] for k in range(len(results))]):
             if all(unmasked):
                 rows.append(i)
 
-        # print(rows)
+        # # print(rows)
         docs = []
         for row in rows:
             docs.append(row_to_doc.get(row))
 
         self.verify_bitmap_consistency()
-        print("----------------- done searching from server", docs)
+        # print("----------------- done searching from server", docs)
         return docs
 
     # the naive model will just send the indices to the server
@@ -451,12 +467,12 @@ class ClientManager(models.Model):
         for keyword in keywords:
             indices.append(self.compute_word_indices(keyword))
 
-        # print("search indices: ", indices)
+        # # print("search indices: ", indices)
         ids = set()
         for account in self.account_ids:
             lst = [tuple(sorted(e)) for e in account.search_keywords_indices(indices)]
             nids = set(lst)
-            # print("result: ", nids, ids)
+            # # print("result: ", nids, ids)
             if not ids:
                 ids = nids
             elif ids != nids:
@@ -553,7 +569,7 @@ class ODoryAccount(models.Model):
         col_macs_json = models.execute_kw(
             self.db, uid, self.password, "res.users", "retrieve_col_macs", [[uid]]
         )
-        print(col_macs_json)
+        # print(col_macs_json)
         if not col_macs_json:
             return [0 for i in range(self.manager_id.bloom_filter_k)]
         col_macs = json.loads(col_macs_json)
@@ -583,7 +599,7 @@ class ODoryAccount(models.Model):
                 macs = m
             else:
                 macs = [macs[i] ^ m[i] for i in range(len(m))]
-        print("compute macs for doc ids", macs)
+        # print("compute macs for doc ids", macs)
         return macs
 
     # given raw files, we should upload to a partition
@@ -731,7 +747,3 @@ class DocumentRecord(models.Model):
         required=True,
         readonly=True,
     )
-
-    # should removing a document here
-    # remove the document stored on the server?
-    # maybe that should be a separate action

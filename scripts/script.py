@@ -61,20 +61,28 @@ def run(doc_num, needle, auto_remove=1):
 
     try:
         word_num = 100
-        words = ["".join(random.choices(string.ascii_uppercase + string.digits, k=10))
-            for i in range(word_num)]
-        
+        words = [
+            "".join(random.choices(string.ascii_uppercase + string.digits, k=10))
+            for i in range(word_num)
+        ]
+
         msgs = [
             " ".join(random.sample(words, random.randint(1, len(words))))
             for i in range(doc_num)
         ]
 
-        add_needles = sorted(random.sample(range(doc_num), random.randint(1, doc_num//2)))
+        add_needles = sorted(
+            random.sample(range(doc_num), random.randint(1, doc_num // 2))
+        )
         for i in add_needles:
             msgs[i] = msgs[i] + " " + needle
 
-        logging.info("Generating {} keywords, needle is {}, {}".format(word_num, needle, add_needles))
-        
+        logging.info(
+            "Generating {} keywords, needle is {}, {}".format(
+                word_num, needle, add_needles
+            )
+        )
+
         data = []
 
         for i, msg in enumerate(msgs):
@@ -88,7 +96,7 @@ def run(doc_num, needle, auto_remove=1):
                     },
                 ]
             )
-            
+
         logging.info("Uploading {} documents with upload wizard".format(doc_num))
 
         wizard_upload_id = models.execute_kw(
@@ -110,7 +118,7 @@ def run(doc_num, needle, auto_remove=1):
         )
 
         search_data = [[0, 0, {"search_term": needle}]]
-        
+
         logging.info(
             "Searching keyword {} over all documents with search wizard".format(
                 search_data[0][2].get("search_term")
@@ -164,13 +172,15 @@ def run(doc_num, needle, auto_remove=1):
         [[["manager_id", "=", manager_id]]],
         {"fields": ["doc_id", "name"]},
     )
-    
+
     # for doc_id in doc_ids:
     #     logging.info("{}:{}".format(doc_id.get("doc_id"), doc_id.get("name")))
 
-    expected_result = [doc_id.get("doc_id") for doc_id in doc_ids if doc_id.get("name") == needle]
+    expected_result = [
+        doc_id.get("doc_id") for doc_id in doc_ids if doc_id.get("name") == needle
+    ]
     logging.info("Expected result: {}".format(expected_result))
-    
+
     expected_res = set(expected_result)
 
     if search_res.intersection(expected_res) == expected_res:
@@ -179,7 +189,7 @@ def run(doc_num, needle, auto_remove=1):
         logging.error("False results")
 
     if auto_remove:
-    
+
         delete_data = []
         for doc in doc_ids:
             delete_data.append([0, 0, {"document_id": int(doc.get("doc_id"))}])

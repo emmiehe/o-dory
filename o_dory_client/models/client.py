@@ -28,7 +28,7 @@ class ClientManager(models.Model):
     )
 
     bloom_filter_k = fields.Integer(
-        "Bitmap Width", default=128
+        "Bitmap Width", default=1000
     )  # this is actually bloom_filter width
     hash_count = fields.Integer("Hash Count", default=7)
 
@@ -63,10 +63,13 @@ class ClientManager(models.Model):
         mask = bin(int(hashlib.sha256((version + self.salt).encode()).hexdigest(), 16))[
             2 : 2 + self.bloom_filter_k
         ]
+        mask = [int(m) for m in mask]
+        while len(mask) < self.bloom_filter_k:
+            mask.extend(mask)
         # fake mask
         # mask = [0 for i in range(self.bloom_filter_k)]
         print("~~~~ get mask from doc version:", version, mask)
-        return [int(m) for m in mask]
+        return mask[:self.bloom_filter_k]
 
     def make_bloom_filter_row(self, keywords):
         self.ensure_one()

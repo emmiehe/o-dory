@@ -31,7 +31,7 @@ class ServerFolder(models.Model):
 
     def col_macs_create(self):
         self.ensure_one()
-        return [0 for i in range(self.bitmap_width)]
+        return []
 
     def col_macs_serialize(self, col_macs_obj):
         return json.dumps(col_macs_obj)
@@ -62,14 +62,16 @@ class ServerFolder(models.Model):
         self.ensure_one()
         items = list(bitmaps_obj.items())
         cols = []
-        for i in range(self.bitmap_width):
-            cols.append([0] * len(items))
         row_to_doc = dict()
-        for i in range(len(items)):
-            doc_id, row = items[i]
-            row_to_doc[i] = doc_id
-            for j in range(len(row)):
-                cols[j][i] = row[j]
+        if items:
+            bitmap_width = len(list(items[0][1]))
+            for i in range(bitmap_width):
+                cols.append([0] * len(items))
+            for i in range(len(items)):
+                doc_id, row = items[i]
+                row_to_doc[i] = doc_id
+                for j in range(len(row)):
+                    cols[j][i] = row[j]
         # print("...", cols, row_to_doc)
         return cols, row_to_doc
 

@@ -30,7 +30,7 @@ class ClientManager(models.Model):
     bloom_filter_k = fields.Integer(
         "Bitmap Width", default=128
     )  # this is actually bloom_filter width
-    hash_count = fields.Integer("Hash Count", default=3)
+    hash_count = fields.Integer("Hash Count", default=7)
 
     def _get_salt(self):
         return "".join(random.choices(string.ascii_uppercase + string.digits, k=20))
@@ -52,11 +52,6 @@ class ClientManager(models.Model):
 
     def compute_word_indices(self, word):
         self.ensure_one()
-        # res = (
-        #     int(hashlib.sha256((word + self.salt).encode()).hexdigest(), 16)
-        #     & self.bloom_filter_k
-        # )
-        # todo: handle hash collision?
         indices = self.hash_word_to_indices(word)
         return sorted(list(set(indices)))
 
@@ -155,11 +150,14 @@ class ClientManager(models.Model):
             raise ValidationError(_("bitmaps versions don't match"))
 
     def verify_and_retrieve_current_macs(self):
+        self.ensure_one()
         old_macs_lst = [account.retrieve_col_macs() for account in self.account_ids]
         if not all(om == old_macs_lst[0] for om in old_macs_lst):
             raise ValidationError(_("MACs don't match"))
 
         old_macs = old_macs_lst[0]
+        if not old_macs:
+            return [0 for i in range(self.bloom_filter_k)]
 
         return old_macs
 

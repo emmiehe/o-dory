@@ -246,8 +246,8 @@ class ResUsers(models.Model):
         bitmaps = folder_id.bitmaps_deserialize(bitmaps)
         cols, row_to_doc = folder_id.bitmaps_flip(bitmaps)
         doc_count = len(bitmaps)
-        bloom_filter_k = folder_id.bitmap_width
-        results = [[0 for x in range(doc_count)] for y in range(bloom_filter_k)]
+        bloom_filter_width = len(list(bitmaps.items())[0][1])
+        results = [[0 for x in range(doc_count)] for y in range(bloom_filter_width)]
         for j, s in enumerate(secrets):
             x, k = s
             x = np.array(x, dtype=np.int32)

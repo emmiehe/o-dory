@@ -6,7 +6,7 @@
       <field name="name">Alice</field>
       <field name="bloom_filter_k" eval="128"/>
       <field name="salt">somesalt</field>
-      <field name="hash_count" eval="3"/>
+      <field name="hash_count" eval="7"/>
     </record>
 
     <record id="account_alice1" model="o.dory.account">

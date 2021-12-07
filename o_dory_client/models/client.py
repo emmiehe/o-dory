@@ -371,13 +371,6 @@ class ClientManager(models.Model):
         indices = self.compute_word_indices(keywords[0])
 
         # print("keywords: indices ", keywords, indices)
-
-        # a, b = self.prepare_dpf(indices)
-        # account_a, account_b = self.account_ids[0], self.account_ids[1]
-
-        # search_data_a = account_a.search_keywords(0, json.dumps(a))
-        # search_data_b = account_b.search_keywords(1, json.dumps(b))
-
         params = self.prepare_dpf(indices)
         with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
             futures = [
@@ -394,20 +387,18 @@ class ClientManager(models.Model):
 
         rs_a, row_to_doc, doc_versions = json.loads(search_data_a)
         rs_b, __, __ = json.loads(search_data_b)
-        # # print(rs_a)
+        # print(rs_a)
         # print(rs_b)
         # combining results
         results = []
         for i, ra in enumerate(rs_a):
             rb = rs_b[i]
-            # In PySyft, the AdditiveSharingTensor class will take care of the modulo
             res = []
             for j, r_a in enumerate(ra):
                 r_b = rb[j]
                 res.append(r_a ^ r_b)
-                # res.append((r_a + r_b) % (2 ** (eq.N * 8)))
             results.append(res)
-        # todo: need to do the doc conversion
+        
         # conveniently, the only valid columns are the indexed columns
         results = [col for (i, col) in enumerate(results) if i in indices]
 
@@ -436,7 +427,7 @@ class ClientManager(models.Model):
                 raise ValidationError(_("MACs don't match. Server could be corrupted."))
 
         # print("row to doc ", row_to_doc)
-        print("versions ", versions)
+        # print("versions ", versions)
         # i is row
         rows = []
         for i in range(len(results[0])):
@@ -446,11 +437,10 @@ class ClientManager(models.Model):
             # print("selected mask ", mask)
             unmasked = [results[k][i] ^ mask[k] for k in range(len(results))]
             # print("unmasked ", unmasked)
-            # if all([results[k][i] for k in range(len(results))]):
             if all(unmasked):
                 rows.append(i)
 
-        # # print(rows)
+        # print(rows)
         docs = []
         for row in rows:
             docs.append(row_to_doc.get(row))

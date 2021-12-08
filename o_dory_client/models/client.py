@@ -161,7 +161,7 @@ class ClientManager(models.Model):
             raise ValidationError(_("MACs don't match"))
 
         old_macs = old_macs_lst[0]
-        if not old_macs or all(not om for om in old_macs): # in case user changed bf
+        if not old_macs or all(not om for om in old_macs):  # in case user changed bf
             return [0 for i in range(self.bloom_filter_k)]
 
         return old_macs

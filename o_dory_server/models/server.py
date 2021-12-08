@@ -17,7 +17,7 @@ class ServerFolder(models.Model):
     )
 
     bitmap_version = fields.Integer("Bitmap Version")
-    bitmap_width = fields.Integer("Bitmap Width", default=128)
+    # bitmap_width = fields.Integer("Bitmap Width", default=128)
     bitmaps = fields.Binary("Bitmaps", attachment=False)
 
     # for authentication purposes
@@ -25,9 +25,9 @@ class ServerFolder(models.Model):
     col_macs = fields.Binary("MACs", attachment=False)
 
     # a field for display only
-    bitmaps_str = fields.Char(
-        "Bitmaps String", compute="_compute_bitmaps_str", store=True
-    )  # this field should be removed later
+    # bitmaps_str = fields.Char(
+    #     "Bitmaps String", compute="_compute_bitmaps_str", store=True
+    # )  # this field should be removed later
 
     def col_macs_create(self):
         self.ensure_one()
@@ -93,13 +93,13 @@ class ServerFolder(models.Model):
                 removed += 1
         return count == removed
 
-    @api.depends("bitmaps")
-    def _compute_bitmaps_str(self):
-        for fid in self:
-            dic = fid.bitmaps_deserialize(fid.bitmaps) if fid.bitmaps else {}
-            fid.bitmaps_str = "\n".join(
-                ["{}: {}".format(k, v) for (k, v) in dic.items()]
-            )
+    # @api.depends("bitmaps")
+    # def _compute_bitmaps_str(self):
+    #     for fid in self:
+    #         dic = fid.bitmaps_deserialize(fid.bitmaps) if fid.bitmaps else {}
+    #         fid.bitmaps_str = "\n".join(
+    #             ["{}: {}".format(k, v) for (k, v) in dic.items()]
+    #         )
 
     @api.model_create_multi
     def create(self, vals_list):
@@ -118,6 +118,6 @@ class EncryptedDocument(models.Model):
     # not sure if we really need a name for the file, but keep it for now
     # name = fields.Char("Name")
     blob = fields.Binary("Encrypted Blob")  # maybe this should be binary
-    folder_id = fields.Many2one("server.folder", ondelete="restrict", string="Folder")
+    folder_id = fields.Many2one("server.folder", ondelete="cascade", string="Folder")
     user_id = fields.Many2one(related="folder_id.user_id")
     version = fields.Char("Version")

@@ -41,7 +41,7 @@ class ClientManager(models.Model):
     # a crude extraction
     def extract_keywords(self, raw_file):
         content = base64.decodebytes(raw_file).decode("utf-8").strip()
-        res = re.findall(r'\w+|[\u263a-\U0001ffff]+', content)
+        res = re.findall(r"\w+|[\u263a-\U0001ffff]+", content)
         # res = re.findall("\w+", content)
         return res
 
@@ -401,7 +401,7 @@ class ClientManager(models.Model):
                 r_b = rb[j]
                 res.append(r_a ^ r_b)
             results.append(res)
-        
+
         # conveniently, the only valid columns are the indexed columns
         results = [col for (i, col) in enumerate(results) if i in indices]
 

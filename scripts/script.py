@@ -27,13 +27,13 @@ logging.basicConfig(
 )
 
 # n is the amount of keywords we expect to have
-# p is the false positive rate range [0, 1] that is acceptable
+# p is the false positive rate range (0, 1) that is acceptable
 # m is the bloom filter width (num of bits)
 # k is the hash count
 def calc_bloom_filter_width_and_hash_count(n, p):
     m = round(-n * math.log(p) / (math.log(2) ** 2))
     k = round(m / n * math.log(2))
-    return m, k
+    return m if m else 1, k if k else 1
 
 
 def login_and_verify_access(url, db, username, password, target_models=[]):
@@ -444,6 +444,6 @@ if __name__ == "__main__":
     doc_num = int(sys.argv[4])
     needle = sys.argv[5]
     auto_remove = int(sys.argv[6])
-    assert word_num > 0 and p > 0 and doc_num > 0
+    assert word_num > 0 and 0 < p < 1 and doc_num > 0
     bf_width, hash_count = calc_bloom_filter_width_and_hash_count(word_num, p)
     run(username, bf_width, hash_count, word_num, doc_num, needle, auto_remove)

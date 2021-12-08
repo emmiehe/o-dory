@@ -66,6 +66,8 @@
 	    <group>
 	      <group>
 		<field name="name"/>
+		<!-- <field name="bloom_filter_k"/> -->
+		<!-- <field name="hash_count"/> -->
 	      </group>
 	    </group>
 

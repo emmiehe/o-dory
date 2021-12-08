@@ -29,9 +29,9 @@ class ClientManager(models.Model):
     )
 
     bloom_filter_k = fields.Integer(
-        "Bitmap Width", default=1000
+        "Bitmap Width", default=479
     )  # this is actually bloom_filter width
-    hash_count = fields.Integer("Hash Count", default=7)
+    hash_count = fields.Integer("Hash Count", default=3)
 
     def _get_salt(self):
         return "".join(random.choices(string.ascii_uppercase + string.digits, k=20))
@@ -161,7 +161,7 @@ class ClientManager(models.Model):
             raise ValidationError(_("MACs don't match"))
 
         old_macs = old_macs_lst[0]
-        if not old_macs:
+        if not old_macs or all(not om for om in old_macs): # in case user changed bf
             return [0 for i in range(self.bloom_filter_k)]
 
         return old_macs

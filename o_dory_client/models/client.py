@@ -41,7 +41,8 @@ class ClientManager(models.Model):
     # a crude extraction
     def extract_keywords(self, raw_file):
         content = base64.decodebytes(raw_file).decode("utf-8").strip()
-        res = re.findall("\w+", content)
+        res = re.findall(r'\w+|[\u263a-\U0001ffff]+', content)
+        # res = re.findall("\w+", content)
         return res
 
     def hash_word_to_indices(self, word):
@@ -364,6 +365,8 @@ class ClientManager(models.Model):
             raise ValidationError(_("Need exactly two servers for searching."))
 
         server_macs = self.verify_and_retrieve_current_macs()
+        if all(not m for m in server_macs):
+            return []
 
         # todo: for now only consider keywords is a list of one element
         # due to the wizard/frontend setup this is actually true
@@ -479,7 +482,7 @@ class ODoryAccount(models.Model):
     _description = "O-DORY Account"
 
     manager_id = fields.Many2one(
-        "client.manager", ondelete="restrict", string="Client Manager"
+        "client.manager", ondelete="cascade", string="Client Manager"
     )
 
     # name = fields.Char("Name") # optional name
@@ -732,7 +735,7 @@ class DocumentRecord(models.Model):
     doc_id = fields.Integer("Document ID", required=True)
     manager_id = fields.Many2one(
         "client.manager",
-        ondelete="restrict",
+        ondelete="cascade",
         string="O-DORY Client Manager",
         required=True,
         readonly=True,

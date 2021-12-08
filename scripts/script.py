@@ -1,10 +1,24 @@
 import sys, logging, base64, random, string
 from xmlrpc import client
 
+# client
 URL = "http://127.0.0.1:8069"
 DB = "o_dory_client"
 USER = "admin"
 PW = "admin"
+
+# server one
+URL_SERVER_ONE = "http://localhost:8898"
+DB_SERVER_ONE = "o_dory_server_one"
+ADMIN_ONE = "admin"
+ADMIN_ONE_PW = "admin"
+
+# server two
+URL_SERVER_TWO = "http://localhost:8899"
+DB_SERVER_TWO = "o_dory_server_two"
+ADMIN_TWO = "admin"
+ADMIN_TWO_PW = "admin"
+
 
 logging.basicConfig(
     level=logging.DEBUG,
@@ -13,7 +27,7 @@ logging.basicConfig(
 )
 
 
-def login_and_verify_access(url, db, username, password, target_models):
+def login_and_verify_access(url, db, username, password, target_models=[]):
     # Logging in
     common = client.ServerProxy("{}/xmlrpc/2/common".format(url))
     # print(common.version())
@@ -39,188 +53,328 @@ def login_and_verify_access(url, db, username, password, target_models):
 
     return uid, models
 
+def create_user_server(url, db, login, pw, username):
+    admin, models = login_and_verify_access(url, db, login, pw)
+    partner_id = models.execute_kw(
+        db,
+        admin,
+        pw,
+        "res.partner",
+        "create",
+        [{"name": username}],
+    )
+    user_id = models.execute_kw(
+        db,
+        admin,
+        pw,
+        "res.users",
+        "create",
+        [{"login": username, "password": username, "partner_id": partner_id}],
+    )
+    folder_id = models.execute_kw(
+        db,
+        admin,
+        pw,
+        "server.folder",
+        "create",
+        [{"user_id": user_id, "name": username}],
+    )
+    logging.info("created {}({}) on server {}({})".format(username, user_id, db, url))
+    return partner_id, user_id, folder_id
 
-def run(doc_num, needle, auto_remove=1):
-    url, db, username, password = URL, DB, USER, PW
-    target_models = [
-        "client.wizard",
-        "client.data.wizard",
-    ]
-    uid, models = login_and_verify_access(url, db, username, password, target_models)
+def remove_user_server(url, db, login, pw, ids):
+    partner_id, user_id, folder_id = ids
+    admin, models = login_and_verify_access(url, db, login, pw)
+    models.execute_kw(
+        db,
+        admin,
+        pw,
+        "server.folder",
+        "unlink",
+        [folder_id],
+    )
+    models.execute_kw(
+        db,
+        admin,
+        pw,
+        "res.users",
+        "unlink",
+        [user_id],
+    )
+    models.execute_kw(
+        db,
+        admin,
+        pw,
+        "res.partner",
+        "unlink",
+        [partner_id],
+    )
+    logging.info("removed user {}({}) from server {}({})".format(user_id, folder_id, db, url))
+
+def create_users_server(username):
+    user1_ids = create_user_server(URL_SERVER_ONE, DB_SERVER_ONE, ADMIN_ONE, ADMIN_ONE_PW, username)
+    user2_ids = create_user_server(URL_SERVER_TWO, DB_SERVER_TWO, ADMIN_TWO, ADMIN_TWO_PW, username)
+    return user1_ids, user2_ids
+
+def remove_users_server(user_ids):
+    assert(len(user_ids) == 2)
+    remove_user_server(URL_SERVER_ONE, DB_SERVER_ONE, ADMIN_ONE, ADMIN_ONE_PW, user_ids[0])
+    remove_user_server(URL_SERVER_TWO, DB_SERVER_TWO, ADMIN_TWO, ADMIN_TWO_PW, user_ids[1])
+
+def create_client_manager(url, db, login, pw, client_params):
+    username, bloom_filter_width, hash_count, salt = client_params
+    uid, models = login_and_verify_access(url, db, login, pw)
     manager_id = models.execute_kw(
         db,
         uid,
-        password,
+        pw,
         "client.manager",
-        "search",
-        [[("name", "=", "Alice")]],
+        "create",
+        [{"name": username, "bloom_filter_k": bloom_filter_width, "hash_count": hash_count, "salt": salt}],
     )
+    logging.info("created client manager {}({})".format(username, manager_id))
 
-    manager_id = manager_id[0]
-    search_res = set()
-
-    try:
-        word_num = 100
-        words = [
-            "".join(random.choices(string.ascii_uppercase + string.digits, k=10))
-            for i in range(word_num)
-        ]
-
-        msgs = [
-            " ".join(random.sample(words, random.randint(1, len(words))))
-            for i in range(doc_num)
-        ]
-
-        add_needles = sorted(
-            random.sample(range(doc_num), random.randint(1, doc_num // 2))
-        )
-        for i in add_needles:
-            msgs[i] = msgs[i] + " " + needle
-
-        logging.info(
-            "Generating {} keywords, needle is {}, {}".format(
-                word_num, needle, add_needles
-            )
-        )
-
-        data = []
-
-        for i, msg in enumerate(msgs):
-            data.append(
-                [
-                    0,
-                    0,
-                    {
-                        "raw_file": base64.b64encode(msg.encode()).decode(),
-                        "filename": needle if i in add_needles else "No needle here",
-                    },
-                ]
-            )
-
-        logging.info("Uploading {} documents with upload wizard".format(doc_num))
-
-        wizard_upload_id = models.execute_kw(
-            db,
-            uid,
-            password,
-            "client.wizard",
-            "create",
-            [
-                {
-                    "manager_id": manager_id,
-                    "data_ids": data,
-                }
-            ],
-        )
-
-        models.execute_kw(
-            db, uid, password, "client.wizard", "action_do_upload", [wizard_upload_id]
-        )
-
-        search_data = [[0, 0, {"search_term": needle}]]
-
-        logging.info(
-            "Searching keyword {} over all documents with search wizard".format(
-                search_data[0][2].get("search_term")
-            )
-        )
-
-        wizard_search_id = models.execute_kw(
-            db,
-            uid,
-            password,
-            "client.wizard",
-            "create",
-            [
-                {
-                    "manager_id": manager_id,
-                    "data_ids": search_data,
-                }
-            ],
-        )
-
-        models.execute_kw(
-            db, uid, password, "client.wizard", "action_do_search", [wizard_search_id]
-        )
-
-        res = models.execute_kw(
-            db,
-            uid,
-            password,
-            "client.data.wizard",
-            "search_read",
-            [[["wizard_id", "=", wizard_search_id]]],
-            {"fields": ["search_result"]},
-        )
-
-        search_result = res[0].get("search_result")
-        search_result = [int(e) for e in search_result[1:-1].split(",")]
-
-        search_res = set(search_result)
-        logging.info("Search result: {}".format(search_result))
-
-    except Exception as e:
-        logging.error("Error during uploading/searching: {}", e)
-        pass
-
-    doc_ids = models.execute_kw(
+    models.execute_kw(
         db,
         uid,
-        password,
-        "document.record",
-        "search_read",
-        [[["manager_id", "=", manager_id]]],
-        {"fields": ["doc_id", "name"]},
+        pw,
+        "o.dory.account",
+        "create",
+        [
+            {"account": username, "password": username, "url": URL_SERVER_ONE, "db": DB_SERVER_ONE, "manager_id": manager_id},
+        ],
+    )
+    models.execute_kw(
+        db,
+        uid,
+        pw,
+        "o.dory.account",
+        "create",
+        [
+            {"account": username, "password": username, "url": URL_SERVER_TWO, "db": DB_SERVER_TWO, "manager_id": manager_id},
+        ],
     )
 
-    # for doc_id in doc_ids:
-    #     logging.info("{}:{}".format(doc_id.get("doc_id"), doc_id.get("name")))
+    return uid, models, manager_id
 
-    expected_result = [
-        doc_id.get("doc_id") for doc_id in doc_ids if doc_id.get("name") == needle
+def remove_client_manager(url, db, login, pw, manager_id):
+    uid, models = login_and_verify_access(url, db, login, pw)
+    models.execute_kw(
+        db,
+        uid,
+        pw,
+        "client.manager",
+        "unlink",
+        [manager_id],
+    )
+    logging.info("removed client manager {}".format(manager_id))
+
+def prepare_doc_data(word_num, doc_num, needle):
+    
+    words = [
+        "".join(random.choices(string.ascii_uppercase + string.digits, k=10))
+        for i in range(word_num)
     ]
-    logging.info("Expected result: {}".format(expected_result))
 
-    expected_res = set(expected_result)
+    msgs = [
+        " ".join(random.sample(words, random.randint(1, len(words))))
+        for i in range(doc_num)
+    ]
 
-    if search_res.intersection(expected_res) == expected_res:
-        logging.info("Search result passed")
-    else:
-        logging.error("False results")
+    add_needles = sorted(
+        random.sample(range(doc_num), random.randint(1, doc_num // 2))
+    )
+    for i in add_needles:
+        msgs[i] = msgs[i] + " " + needle
 
-    if auto_remove:
+    logging.info(
+        "Generating {} keywords, needle is '{}', {}".format(
+            word_num, needle, add_needles
+        )
+    )
 
-        delete_data = []
-        for doc in doc_ids:
-            delete_data.append([0, 0, {"document_id": int(doc.get("doc_id"))}])
+    data = []
 
-        logging.info("Removing all documents")
-        wizard_remove_id = models.execute_kw(
-            db,
-            uid,
-            password,
-            "client.wizard",
-            "create",
+    for i, msg in enumerate(msgs):
+        data.append(
             [
+                0,
+                0,
                 {
-                    "manager_id": manager_id,
-                    "data_ids": delete_data,
-                }
-            ],
+                    "raw_file": base64.b64encode(msg.encode()).decode(),
+                    "filename": needle if i in add_needles else "No needle here",
+                },
+            ]
         )
+    return data
 
-        models.execute_kw(
-            db, uid, password, "client.wizard", "action_do_remove", [wizard_remove_id]
-        )
+def run(name, bf_width, hash_count, word_num, doc_num, needle, auto_remove):
+    logging.info("\n"
+                 "\t username: {}\n"
+                 "\t bloom filter width: {}\n"
+                 "\t hash count: {}\n"
+                 "\t keyword count: {}\n"
+                 "\t document count: {}\n"
+                 "\t needle: {}\n"
+                 "\t autoremove: {}\n"
+                 .format(name, bf_width, hash_count, word_num, doc_num, needle, auto_remove))
+    
+    url, db, username, password = URL, DB, USER, PW
+    
+    user = name + "@odory.com"
+
+    try:
+    
+        user_ids = create_users_server(user)
+        user1_ids, user2_ids = user_ids
+        try:
+            client_data = [user, bf_width, hash_count, user]
+            uid, models, manager_id = create_client_manager(url, db, username, password, client_data)
+
+            ### uploading & searching
+            search_res = set()
+            try:
+                data = prepare_doc_data(word_num, doc_num, needle)
+                logging.info("Uploading {} documents with upload wizard".format(doc_num))
+
+                wizard_upload_id = models.execute_kw(
+                    db,
+                    uid,
+                    password,
+                    "client.wizard",
+                    "create",
+                    [
+                        {
+                            "manager_id": manager_id,
+                            "data_ids": data,
+                        }
+                    ],
+                )
+
+                models.execute_kw(
+                    db, uid, password, "client.wizard", "action_do_upload", [wizard_upload_id]
+                )
+
+                search_data = [[0, 0, {"search_term": needle}]]
+
+                logging.info(
+                    "Searching keyword '{}' over all documents with search wizard".format(
+                        search_data[0][2].get("search_term")
+                    )
+                )
+
+                wizard_search_id = models.execute_kw(
+                    db,
+                    uid,
+                    password,
+                    "client.wizard",
+                    "create",
+                    [
+                        {
+                            "manager_id": manager_id,
+                            "data_ids": search_data,
+                        }
+                    ],
+                )
+                
+                models.execute_kw(
+                    db, uid, password, "client.wizard", "action_do_search", [wizard_search_id]
+                )
+
+                res = models.execute_kw(
+                    db,
+                    uid,
+                    password,
+                    "client.data.wizard",
+                    "search_read",
+                    [[["wizard_id", "=", wizard_search_id]]],
+                    {"fields": ["search_result"]},
+                )
+
+                search_result = res[0].get("search_result")
+                search_result = [int(e) for e in search_result[1:-1].split(",")]
+
+                search_res = set(search_result)
+                logging.info("Search result: {}".format(search_result))
+                
+            except Exception as e:
+                logging.error("Error during uploading/searching: {}".format(e))
+
+            doc_ids = models.execute_kw(
+                db,
+                uid,
+                password,
+                "document.record",
+                "search_read",
+                [[["manager_id", "=", manager_id]]],
+                {"fields": ["doc_id", "name"]},
+            )
+
+            # for doc_id in doc_ids:
+            #     logging.info("{}:{}".format(doc_id.get("doc_id"), doc_id.get("name")))
+
+            expected_result = [
+                doc_id.get("doc_id") for doc_id in doc_ids if doc_id.get("name") == needle
+            ]
+            logging.info("Expected result: {}".format(expected_result))
+
+            expected_res = set(expected_result)
+
+            if search_res.intersection(expected_res) == expected_res:
+                logging.info("Search result passed")
+            else:
+                logging.error("False results")
+                
+            if auto_remove:
+                delete_data = []
+                for doc in doc_ids:
+                    delete_data.append([0, 0, {"document_id": int(doc.get("doc_id"))}])
+
+                logging.info("Removing all documents")
+                wizard_remove_id = models.execute_kw(
+                    db,
+                    uid,
+                    password,
+                    "client.wizard",
+                    "create",
+                    [
+                        {
+                            "manager_id": manager_id,
+                            "data_ids": delete_data,
+                        }
+                    ],
+                )
+                    
+                models.execute_kw(
+                    db, uid, password, "client.wizard", "action_do_remove", [wizard_remove_id]
+                )
+            
+                remove_client_manager(url, db, username, password, manager_id)
+        except Exception as e:
+            logging.error("Error creating client manager: {}".format(e))
+        
+        if auto_remove:
+            remove_users_server(user_ids)
+
+    except Exception as e:
+        logging.error("Error creating user on the servers: {}".format(e))
+        
 
     logging.info("Done")
 
 
 if __name__ == "__main__":
-    if len(sys.argv[1:]) < 2:
-        print("input: <doc_num> <needle str>")
+    if len(sys.argv[1:]) < 7:
+        print("input: <username str> <bloom_filter_bit_count int> <hash_count int> <keyword_num int> <document_num int> <needle str> <auto_remove int>\n"
+              "ex: bob 480 4 100 100 needle 1"
+              )
         sys.exit()
 
-    doc_num = int(sys.argv[1])
-    needle = sys.argv[2]
-    run(doc_num, needle, 1)
+    username = sys.argv[1]
+    bf_width = int(sys.argv[2])
+    hash_count = int(sys.argv[3])
+    word_num = int(sys.argv[4])
+    doc_num = int(sys.argv[5])
+    needle = sys.argv[6]
+    auto_remove = int(sys.argv[7])
+    run(username, bf_width, hash_count, word_num, doc_num, needle, auto_remove)

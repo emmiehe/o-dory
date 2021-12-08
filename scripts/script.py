@@ -245,7 +245,9 @@ def prepare_doc_data(word_num, doc_num, needle):
                 0,
                 {
                     "raw_file": base64.b64encode(msg.encode()).decode(),
-                    "filename": needle if i in add_needles else "No {} here".format(needle),
+                    "filename": needle
+                    if i in add_needles
+                    else "No {} here".format(needle),
                 },
             ]
         )

@@ -89,7 +89,7 @@ def create_user_server(url, db, login, pw, username):
         "create",
         [{"user_id": user_id, "name": username}],
     )
-    logging.info("created {}({}) on server {}({})".format(username, user_id, db, url))
+    logging.info("Created {}({}) on server {}({})".format(username, user_id, db, url))
     return partner_id, user_id, folder_id
 
 
@@ -121,7 +121,7 @@ def remove_user_server(url, db, login, pw, ids):
         [partner_id],
     )
     logging.info(
-        "removed user {}({}) from server {}({})".format(user_id, folder_id, db, url)
+        "Removed user {}({}) from server {}({})".format(user_id, folder_id, db, url)
     )
 
 
@@ -163,7 +163,7 @@ def create_client_manager(url, db, login, pw, client_params):
             }
         ],
     )
-    logging.info("created client manager {}({})".format(username, manager_id))
+    logging.info("Created client manager {}({})".format(username, manager_id))
 
     models.execute_kw(
         db,
@@ -211,7 +211,7 @@ def remove_client_manager(url, db, login, pw, manager_id):
         "unlink",
         [manager_id],
     )
-    logging.info("removed client manager {}".format(manager_id))
+    logging.info("Removed client manager {}".format(manager_id))
 
 
 def prepare_doc_data(word_num, doc_num, needle):

@@ -270,7 +270,7 @@ def run(name, bf_width, hash_count, word_num, doc_num, needle, auto_remove):
 
     url, db, username, password = URL, DB, USER, PW
 
-    user = name + "@odory.com"
+    user = name + "@o-dory.com"
 
     try:
 

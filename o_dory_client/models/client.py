@@ -6,10 +6,12 @@ from xmlrpc import client
 # import odoo.addons.decimal_precision as dp
 import mmh3
 import numpy as np
-import sycret, random, math
+import sycret, random, math, logging
 import random, base64, re, string, hashlib
 import ujson as json
 import concurrent.futures
+
+_logger = logging.getLogger(__name__)
 
 eq = sycret.EqFactory(n_threads=10)
 

@@ -6,7 +6,7 @@ from xmlrpc import client
 # import odoo.addons.decimal_precision as dp
 import mmh3
 import numpy as np
-import sycret, random
+import sycret, random, math
 import random, base64, re, string, hashlib
 import ujson as json
 import concurrent.futures
@@ -68,9 +68,6 @@ class ClientManager(models.Model):
         mask = [int(m) for m in mask]
         while len(mask) < self.bloom_filter_width:
             mask.extend(mask)
-        # fake mask
-        # mask = [0 for i in range(self.bloom_filter_width)]
-        # print("~~~~ get mask from doc version:", version, mask)
         return mask[: self.bloom_filter_width]
 
     def make_bloom_filter_row(self, keywords):
@@ -328,16 +325,11 @@ class ClientManager(models.Model):
     def retrieve_files(self, fids):  # a list of fid
         raise ValidationError(_("retrieve files failed"))
 
-    def prepare_dpf(self, target_indices):
-        self.verify_bitmap_consistency()
-        doc_num = self.get_doc_count()
-        # the idea is that we want dpf for every column
-        # the end results should be two chunks
+    def prepare_dpf_sub(self, target_indices, doc_num, start, end):
         a, b = [], []
-        # slightly worried about perf
-        for i in range(self.bloom_filter_width):
+        for i in range(start, end):
             keys_a, keys_b = eq.keygen(doc_num)
-            # Reshape to a C-contiguous array (necessary for from_buffer)
+            # Reshape to a C-contiguous array (according to the lib)
             alpha = eq.alpha(keys_a, keys_b)
             x = alpha.astype(np.int32)
 
@@ -351,10 +343,40 @@ class ClientManager(models.Model):
             x = x.tolist()
             a.append([x, keys_a.tolist()])
             b.append([x.copy(), keys_b.tolist()])
+        return a, b
+
+    def prepare_dpf(self, target_indices):
+        # self.verify_bitmap_consistency()
+        doc_num = self.get_doc_count()
+        # the idea is that we want dpf for every column
+        # the end results should be two chunks
+        a, b = [], []
+        # batch keygen depends on bloom_filter_width
+        # wanna do something like this:
+        # [[a[k] for k in range(j*batch, min(j*batch+batch, len(a)))] for j in range(math.ceil(len(a)/batch))]
+        batch_size = 100
+        batch_count = math.ceil(self.bloom_filter_width / batch_size)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=batch_count) as executor:
+            batches = [
+                executor.submit(
+                    ClientManager.prepare_dpf_sub,
+                    self,
+                    target_indices,
+                    doc_num,
+                    i * batch_size,
+                    min(i * batch_size + batch_size, self.bloom_filter_width),
+                )
+                for i in range(batch_count)
+            ]
+
+        for batch in batches:
+            a_sub, b_sub = batch.result()
+            a.extend(a_sub)
+            b.extend(b_sub)
 
         # print("=== SHAPE ", len(a), len(a[0]), len(a[0][1]), len(a[0][1][0]))
 
-        self.verify_bitmap_consistency()
+        # self.verify_bitmap_consistency()
         return a, b
 
     # prepare dpf secrets here and send to each partitions
@@ -374,7 +396,9 @@ class ClientManager(models.Model):
         indices = self.compute_word_indices(keywords[0])
 
         # print("keywords: indices ", keywords, indices)
+        _logger.warning("Client preparing for dpf")
         params = self.prepare_dpf(indices)
+        _logger.warning("Done preparing for dpf")
         with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
             futures = [
                 executor.submit(
@@ -388,6 +412,7 @@ class ClientManager(models.Model):
 
         search_data_a, search_data_b = [f.result() for f in futures]
 
+        _logger.warning("Client received search data, ready to assemble...")
         rs_a, row_to_doc, doc_versions = json.loads(search_data_a)
         rs_b, __, __ = json.loads(search_data_b)
         # print(rs_a)
@@ -448,6 +473,7 @@ class ClientManager(models.Model):
         for row in rows:
             docs.append(row_to_doc.get(row))
 
+        _logger.warning("Done searching keyword")
         self.verify_bitmap_consistency()
         # print("----------------- done searching from server", docs)
         return docs

@@ -1,9 +1,10 @@
 from odoo import api, fields, models, _
 from odoo.exceptions import UserError, ValidationError
 import ujson as json
-import logging, random
+import logging, random, math
 import numpy as np
 import sycret
+import concurrent.futures
 
 _logger = logging.getLogger(__name__)
 
@@ -237,6 +238,20 @@ class ResUsers(models.Model):
 
         return all_ret
 
+    def dpf_eval(self, y, secrets, cols, start, end):
+        ret = []
+        for j in range(start, end):
+            s = secrets[j]
+            x, k = s
+            x = np.array(x, dtype=np.int32)
+            k = np.array(k, dtype=np.uint8)
+            output = eq.eval(y, x, k)
+            output = output.tolist()
+            for i in range(len(output)):
+                output[i] &= cols[j][i]
+            ret.append(output)
+        return ret
+
     # server evals the secret
     def server_search(self, y, secrets):
         _logger.warning("Started server search")
@@ -248,14 +263,36 @@ class ResUsers(models.Model):
         doc_count = len(bitmaps)
         bloom_filter_width = len(next(iter(bitmaps.values())))
         results = [[0 for x in range(doc_count)] for y in range(bloom_filter_width)]
+        # I'd like to try a shared mem approach in the future
+        # for now observing that numpy conversion and eval take most time
+        # so we try to do concurrent future again to gather these values first
+        outputs = []
+        # batch keygen depends on bloom_filter_width
+        # wanna do something like this:
+        # [[a[k] for k in range(j*batch, min(j*batch+batch, len(a)))] for j in range(math.ceil(len(a)/batch))]
+        batch_size = 100
+        batch_count = math.ceil(bloom_filter_width / batch_size)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=batch_count) as executor:
+            batches = [
+                executor.submit(
+                    ResUsers.dpf_eval,
+                    self,
+                    y,
+                    secrets,
+                    cols,
+                    i * batch_size,
+                    min(i * batch_size + batch_size, bloom_filter_width),
+                )
+                for i in range(batch_count)
+            ]
+
+        for batch in batches:
+            outputs_sub = batch.result()
+            outputs.extend(outputs_sub)
+
         for j, s in enumerate(secrets):
-            x, k = s
-            x = np.array(x, dtype=np.int32)
-            k = np.array(k, dtype=np.uint8)
-            output = eq.eval(y, x, k)
-            output = output.tolist()
             for i in range(doc_count):
-                results[j][i] ^= output[i] & cols[j][i]
+                results[j][i] ^= outputs[j][i]
         _logger.warning("Done server search")
 
         # return results, list(row_to_doc.items()), doc_versions

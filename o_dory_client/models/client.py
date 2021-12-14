@@ -28,7 +28,7 @@ class ClientManager(models.Model):
         help="Records for documents that are uploaded/updated from this client.",
     )
 
-    bloom_filter_k = fields.Integer(
+    bloom_filter_width = fields.Integer(
         "Bitmap Width", default=479
     )  # this is actually bloom_filter width
     hash_count = fields.Integer("Hash Count", default=3)
@@ -48,7 +48,7 @@ class ClientManager(models.Model):
     def hash_word_to_indices(self, word):
         self.ensure_one()
         return [
-            mmh3.hash(word + self.salt, seed) % self.bloom_filter_k
+            mmh3.hash(word + self.salt, seed) % self.bloom_filter_width
             for seed in range(self.hash_count)
         ]
 
@@ -63,19 +63,19 @@ class ClientManager(models.Model):
     def get_mask_from_doc_version(self, version):
         self.ensure_one()
         mask = bin(int(hashlib.sha256((version + self.salt).encode()).hexdigest(), 16))[
-            2 : 2 + self.bloom_filter_k
+            2 : 2 + self.bloom_filter_width
         ]
         mask = [int(m) for m in mask]
-        while len(mask) < self.bloom_filter_k:
+        while len(mask) < self.bloom_filter_width:
             mask.extend(mask)
         # fake mask
-        # mask = [0 for i in range(self.bloom_filter_k)]
+        # mask = [0 for i in range(self.bloom_filter_width)]
         # print("~~~~ get mask from doc version:", version, mask)
-        return mask[: self.bloom_filter_k]
+        return mask[: self.bloom_filter_width]
 
     def make_bloom_filter_row(self, keywords):
         self.ensure_one()
-        res = [0] * self.bloom_filter_k
+        res = [0] * self.bloom_filter_width
         for keyword in keywords:
             indices = self.compute_word_indices(keyword)
             for i in indices:
@@ -113,7 +113,7 @@ class ClientManager(models.Model):
         # generate an array of macs
         self.ensure_one()
         res = []
-        for i in range(self.bloom_filter_k):
+        for i in range(self.bloom_filter_width):
             # salt is per client manager (so effectively per folder)
             mac = self.generate_mac(bf_row[i], i, doc_version)
             res.append(mac)
@@ -162,7 +162,7 @@ class ClientManager(models.Model):
 
         old_macs = old_macs_lst[0]
         if not old_macs or all(not om for om in old_macs):  # in case user changed bf
-            return [0 for i in range(self.bloom_filter_k)]
+            return [0 for i in range(self.bloom_filter_width)]
 
         return old_macs
 
@@ -177,7 +177,7 @@ class ClientManager(models.Model):
     def update_col_macs(self, old_macs, new_macs):
         self.ensure_one()
         # print("update col macs", old_macs, new_macs)
-        new_macs = [old_macs[i] ^ new_macs[i] for i in range(self.bloom_filter_k)]
+        new_macs = [old_macs[i] ^ new_macs[i] for i in range(self.bloom_filter_width)]
         # macs needs to be serialized
         updated_macs = json.dumps(new_macs)
         return updated_macs
@@ -335,7 +335,7 @@ class ClientManager(models.Model):
         # the end results should be two chunks
         a, b = [], []
         # slightly worried about perf
-        for i in range(self.bloom_filter_k):
+        for i in range(self.bloom_filter_width):
             keys_a, keys_b = eq.keygen(doc_num)
             # Reshape to a C-contiguous array (necessary for from_buffer)
             alpha = eq.alpha(keys_a, keys_b)
@@ -564,7 +564,7 @@ class ODoryAccount(models.Model):
         )
         # print(col_macs_json)
         if not col_macs_json:
-            return [0 for i in range(self.manager_id.bloom_filter_k)]
+            return [0 for i in range(self.manager_id.bloom_filter_width)]
         col_macs = json.loads(col_macs_json)
         return col_macs
 

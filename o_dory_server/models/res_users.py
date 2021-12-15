@@ -265,7 +265,7 @@ class ResUsers(models.Model):
         results = [[0 for x in range(doc_count)] for y in range(bloom_filter_width)]
         # I'd like to try a shared mem approach in the future
         # for now observing that numpy conversion and eval take most time
-        # so we try to do concurrent future again to gather these values first
+        # we try to do concurrent future again to gather these values first
         outputs = []
         # batch keygen depends on bloom_filter_width
         # wanna do something like this:

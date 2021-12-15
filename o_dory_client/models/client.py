@@ -329,59 +329,33 @@ class ClientManager(models.Model):
     def retrieve_files(self, fids):  # a list of fid
         raise ValidationError(_("retrieve files failed"))
 
-    def prepare_dpf_sub(self, target_indices, start, end):
-        a, b = [], []
-        for i in range(start, end):
-            keys_a, keys_b = eq.keygen(1)
-            # Reshape to a C-contiguous array (according to the lib)
-            alpha = eq.alpha(keys_a, keys_b)
-            x = alpha.astype(np.int32)
-
-            # change non-target columns to 0
-            if i not in target_indices:
-                r = random.randint(-100, 100)
-                x[0] += r if r else 10  # avoid not adding anything
-
-            # # print(x)
-            x = x.tolist()
-            a.append([x, keys_a.tolist()])
-            b.append([x.copy(), keys_b.tolist()])
-        return a, b
-
-    def prepare_dpf_seq(self, target_indices, col_num):
-        a, b = [], []
-        for i in range(col_num):
-            keys_a, keys_b = eq.keygen(1)
-            # Reshape to a C-contiguous array (necessary for from_buffer)
-            alpha = eq.alpha(keys_a, keys_b)
-            x = alpha.astype(np.int32)
-
-            # change non-target columns to 0
-            if i not in target_indices:
-                r = random.randint(-100, 100)
-                x[0] += r if r else 10  # avoid not adding anything
-
-            # # print(x)
-            x = x.tolist()
-            a.append([x, keys_a.tolist()])
-            b.append([x.copy(), keys_b.tolist()])
-
-        # print("=== SHAPE ", len(a), len(a[0]), len(a[0][1]), len(a[0][1][0]))
-        return a, b
+    def prepare_dpf_seq(self, target_indices, start, end):
+        col_num = end - start
+        keys_a, keys_b = eq.keygen(col_num)
+        alpha = eq.alpha(keys_a, keys_b)  # necessary according to sycret
+        x = alpha.astype(np.int32)
+        x = x.tolist()
+        # for those not in our target indices, we add some noise
+        # this is to allow only our target indices eval to 1
+        x = [
+            x[i] if i + start in target_indices else x[i] + random.randint(1, 1000)
+            for i in range(col_num)
+        ]
+        return x, keys_a.tolist(), keys_b.tolist()
 
     def prepare_dpf_async(self, target_indices, col_num):
         # the idea is that we want dpf for every column
         # the end results should be two chunks
-        a, b = [], []
+        x, a, b = [], [], []
         # batch keygen depends on bloom_filter_width
         # wanna do something like this:
         # [[a[k] for k in range(j*batch, min(j*batch+batch, len(a)))] for j in range(math.ceil(len(a)/batch))]
-        batch_size = 100
+        batch_size = 500
         batch_count = math.ceil(col_num / batch_size)
         with concurrent.futures.ThreadPoolExecutor(max_workers=batch_count) as executor:
             batches = [
                 executor.submit(
-                    ClientManager.prepare_dpf_sub,
+                    ClientManager.prepare_dpf_seq,
                     self,
                     target_indices,
                     i * batch_size,
@@ -391,22 +365,22 @@ class ClientManager(models.Model):
             ]
 
         for batch in batches:
-            a_sub, b_sub = batch.result()
+            x_sub, a_sub, b_sub = batch.result()
+            x.extend(x_sub)
             a.extend(a_sub)
             b.extend(b_sub)
 
-        # print("=== SHAPE ", len(a), len(a[0]), len(a[0][1]), len(a[0][1][0]))
-
-        # self.verify_bitmap_consistency()
-        return a, b
+        return x, a, b
 
     def prepare_dpf(self, target_indices):
         # self.verify_bitmap_consistency()
         self.ensure_one()
+        x, a, b = [], [], []
         if self.async_enabled:
-            return self.prepare_dpf_async(target_indices, self.bloom_filter_width)
+            x, a, b = self.prepare_dpf_async(target_indices, self.bloom_filter_width)
         else:
-            return self.prepare_dpf_seq(target_indices, self.bloom_filter_width)
+            x, a, b = self.prepare_dpf_seq(target_indices, 0, self.bloom_filter_width)
+        return [x, a], [x.copy(), b]
 
     # prepare dpf secrets here and send to each partitions
     # should not send all secrets to central server/master

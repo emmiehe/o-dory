@@ -329,19 +329,18 @@ class ClientManager(models.Model):
     def retrieve_files(self, fids):  # a list of fid
         raise ValidationError(_("retrieve files failed"))
 
-    def prepare_dpf_sub(self, target_indices, doc_num, start, end):
+    def prepare_dpf_sub(self, target_indices, start, end):
         a, b = [], []
         for i in range(start, end):
-            keys_a, keys_b = eq.keygen(doc_num)
+            keys_a, keys_b = eq.keygen(1)
             # Reshape to a C-contiguous array (according to the lib)
             alpha = eq.alpha(keys_a, keys_b)
             x = alpha.astype(np.int32)
 
             # change non-target columns to 0
             if i not in target_indices:
-                for k in range(doc_num):
-                    r = random.randint(-100, 100)
-                    x[k] += r if r else 10  # avoid not adding anything
+                r = random.randint(-100, 100)
+                x[0] += r if r else 10  # avoid not adding anything
 
             # # print(x)
             x = x.tolist()
@@ -349,19 +348,18 @@ class ClientManager(models.Model):
             b.append([x.copy(), keys_b.tolist()])
         return a, b
 
-    def prepare_dpf_seq(self, target_indices, doc_num, col_num):
+    def prepare_dpf_seq(self, target_indices, col_num):
         a, b = [], []
         for i in range(col_num):
-            keys_a, keys_b = eq.keygen(doc_num)
+            keys_a, keys_b = eq.keygen(1)
             # Reshape to a C-contiguous array (necessary for from_buffer)
             alpha = eq.alpha(keys_a, keys_b)
             x = alpha.astype(np.int32)
 
             # change non-target columns to 0
             if i not in target_indices:
-                for k in range(doc_num):
-                    r = random.randint(-100, 100)
-                    x[k] += r if r else 10  # avoid not adding anything
+                r = random.randint(-100, 100)
+                x[0] += r if r else 10  # avoid not adding anything
 
             # # print(x)
             x = x.tolist()
@@ -371,7 +369,7 @@ class ClientManager(models.Model):
         # print("=== SHAPE ", len(a), len(a[0]), len(a[0][1]), len(a[0][1][0]))
         return a, b
 
-    def prepare_dpf_async(self, target_indices, doc_num, col_num):
+    def prepare_dpf_async(self, target_indices, col_num):
         # the idea is that we want dpf for every column
         # the end results should be two chunks
         a, b = [], []
@@ -386,7 +384,6 @@ class ClientManager(models.Model):
                     ClientManager.prepare_dpf_sub,
                     self,
                     target_indices,
-                    doc_num,
                     i * batch_size,
                     min(i * batch_size + batch_size, col_num),
                 )
@@ -406,15 +403,10 @@ class ClientManager(models.Model):
     def prepare_dpf(self, target_indices):
         # self.verify_bitmap_consistency()
         self.ensure_one()
-        doc_num = self.get_doc_count()
         if self.async_enabled:
-            return self.prepare_dpf_async(
-                target_indices, doc_num, self.bloom_filter_width
-            )
+            return self.prepare_dpf_async(target_indices, self.bloom_filter_width)
         else:
-            return self.prepare_dpf_seq(
-                target_indices, doc_num, self.bloom_filter_width
-            )
+            return self.prepare_dpf_seq(target_indices, self.bloom_filter_width)
 
     # prepare dpf secrets here and send to each partitions
     # should not send all secrets to central server/master

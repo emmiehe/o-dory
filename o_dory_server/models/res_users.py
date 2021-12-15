@@ -245,8 +245,8 @@ class ResUsers(models.Model):
             k = np.array(k, dtype=np.uint8)
             output = eq.eval(y, x, k)
             output = output.tolist()
-            for i in range(len(output)):
-                results[j][i] ^= output[i] & cols[j][i]
+            for i in range(len(cols[j])):
+                results[j][i] ^= output[0] & cols[j][i]
 
     def dpf_eval(self, y, secrets, cols, start, end):
         ret = []
@@ -257,8 +257,6 @@ class ResUsers(models.Model):
             k = np.array(k, dtype=np.uint8)
             output = eq.eval(y, x, k)
             output = output.tolist()
-            for i in range(len(output)):
-                output[i] &= cols[j][i]
             ret.append(output)
         return ret
 
@@ -292,8 +290,8 @@ class ResUsers(models.Model):
 
         for j, s in enumerate(secrets):
             output = outputs[j]
-            for i in range(len(output)):
-                results[j][i] ^= output[i]
+            for i in range(len(results[j])):
+                results[j][i] ^= output[0] & cols[j][i]
 
     # server evals the secret
     def server_search(self, y, secrets, async_enabled=False):

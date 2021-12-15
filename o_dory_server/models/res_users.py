@@ -238,6 +238,16 @@ class ResUsers(models.Model):
 
         return all_ret
 
+    def server_search_seq(self, y, secrets, cols, results, bloom_filter_width):
+        for j, s in enumerate(secrets):
+            x, k = s
+            x = np.array(x, dtype=np.int32)
+            k = np.array(k, dtype=np.uint8)
+            output = eq.eval(y, x, k)
+            output = output.tolist()
+            for i in range(len(output)):
+                results[j][i] ^= output[i] & cols[j][i]
+
     def dpf_eval(self, y, secrets, cols, start, end):
         ret = []
         for j in range(start, end):
@@ -252,17 +262,7 @@ class ResUsers(models.Model):
             ret.append(output)
         return ret
 
-    # server evals the secret
-    def server_search(self, y, secrets):
-        _logger.warning("Started server search")
-        secrets = json.loads(secrets)
-        folder_id, bitmaps, version = self.get_folder()
-        doc_versions = self.retrieve_doc_versions()
-        bitmaps = folder_id.bitmaps_deserialize(bitmaps)
-        cols, row_to_doc = folder_id.bitmaps_flip(bitmaps)
-        doc_count = len(bitmaps)
-        bloom_filter_width = len(next(iter(bitmaps.values())))
-        results = [[0 for x in range(doc_count)] for y in range(bloom_filter_width)]
+    def server_search_async(self, y, secrets, cols, results, bloom_filter_width):
         # I'd like to try a shared mem approach in the future
         # for now observing that numpy conversion and eval take most time
         # we try to do concurrent future again to gather these values first
@@ -291,9 +291,26 @@ class ResUsers(models.Model):
             outputs.extend(outputs_sub)
 
         for j, s in enumerate(secrets):
-            for i in range(doc_count):
-                results[j][i] ^= outputs[j][i]
-        _logger.warning("Done server search")
+            output = outputs[j]
+            for i in range(len(output)):
+                results[j][i] ^= output[i]
 
+    # server evals the secret
+    def server_search(self, y, secrets, async_enabled=False):
+        _logger.warning("Started server search")
+        secrets = json.loads(secrets)
+        folder_id, bitmaps, version = self.get_folder()
+        doc_versions = self.retrieve_doc_versions()
+        bitmaps = folder_id.bitmaps_deserialize(bitmaps)
+        cols, row_to_doc = folder_id.bitmaps_flip(bitmaps)
+        doc_count = len(bitmaps)
+        bloom_filter_width = len(next(iter(bitmaps.values())))
+        results = [[0 for x in range(doc_count)] for y in range(bloom_filter_width)]
+        if async_enabled:
+            self.server_search_async(y, secrets, cols, results, bloom_filter_width)
+        else:
+            self.server_search_seq(y, secrets, cols, results, bloom_filter_width)
+
+        _logger.warning("Done server search")
         # return results, list(row_to_doc.items()), doc_versions
         return json.dumps((results, list(row_to_doc.items()), doc_versions))

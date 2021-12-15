@@ -191,7 +191,7 @@ def remove_users_server(user_ids):
 
 
 def create_client_manager(url, db, login, pw, client_params):
-    username, bloom_filter_width, hash_count, salt = client_params
+    username, bloom_filter_width, hash_count, salt, async_enabled = client_params
     uid, models = login_and_verify_access(url, db, login, pw)
     manager_id = models.execute_kw(
         db,
@@ -205,6 +205,7 @@ def create_client_manager(url, db, login, pw, client_params):
                 "bloom_filter_width": bloom_filter_width,
                 "hash_count": hash_count,
                 "salt": salt,
+                "async_enabled": async_enabled,
             }
         ],
     )
@@ -299,7 +300,9 @@ def prepare_doc_data(word_num, doc_num, needle):
     return data
 
 
-def run(name, bf_width, hash_count, word_num, doc_num, needle, auto_remove):
+def run(
+    name, bf_width, hash_count, word_num, doc_num, needle, auto_remove, async_enabled
+):
     logging.info(
         "\n"
         "\t username: {}\n"
@@ -308,8 +311,16 @@ def run(name, bf_width, hash_count, word_num, doc_num, needle, auto_remove):
         "\t keyword count: {}\n"
         "\t document count: {}\n"
         "\t needle: {}\n"
-        "\t autoremove: {}\n".format(
-            name, bf_width, hash_count, word_num, doc_num, needle, auto_remove
+        "\t autoremove: {}\n"
+        "\t async enabled: {}\n".format(
+            name,
+            bf_width,
+            hash_count,
+            word_num,
+            doc_num,
+            needle,
+            auto_remove,
+            async_enabled,
         )
     )
 
@@ -322,7 +333,7 @@ def run(name, bf_width, hash_count, word_num, doc_num, needle, auto_remove):
         user_ids = create_users_server(user)
         user1_ids, user2_ids = user_ids
         try:
-            client_data = [user, bf_width, hash_count, user]
+            client_data = [user, bf_width, hash_count, user, async_enabled]
             uid, models, manager_id = create_client_manager(
                 url, db, username, password, client_data
             )
@@ -478,10 +489,10 @@ def run(name, bf_width, hash_count, word_num, doc_num, needle, auto_remove):
 
 
 if __name__ == "__main__":
-    if len(sys.argv[1:]) < 6:
+    if len(sys.argv[1:]) < 7:
         print(
-            "input: <username str> <keyword_num int> <false_positive_rate float> <document_num int> <needle str> <auto_remove int>\n"
-            "ex: bob 100 0.1 100 needle 1"
+            "input: <username str> <keyword_num int> <false_positive_rate float> <document_num int> <needle str> <auto_remove int> <async int>\n"
+            "ex: bob 100 0.1 100 needle 1 0"
         )
         sys.exit()
 
@@ -491,6 +502,16 @@ if __name__ == "__main__":
     doc_num = int(sys.argv[4])
     needle = sys.argv[5]
     auto_remove = int(sys.argv[6])
+    async_enabled = True if int(sys.argv[7]) > 0 else False
     assert word_num > 0 and 0 < p < 1 and doc_num > 0
     bf_width, hash_count = calc_bloom_filter_width_and_hash_count(word_num, p)
-    run(username, bf_width, hash_count, word_num, doc_num, needle, auto_remove)
+    run(
+        username,
+        bf_width,
+        hash_count,
+        word_num,
+        doc_num,
+        needle,
+        auto_remove,
+        async_enabled,
+    )

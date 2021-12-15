@@ -40,6 +40,8 @@ class ClientManager(models.Model):
 
     salt = fields.Char("Salt", default=_get_salt)
 
+    async_enabled = fields.Boolean("Async", default=False)
+
     # a crude extraction
     def extract_keywords(self, raw_file):
         content = base64.decodebytes(raw_file).decode("utf-8").strip()
@@ -347,9 +349,29 @@ class ClientManager(models.Model):
             b.append([x.copy(), keys_b.tolist()])
         return a, b
 
-    def prepare_dpf(self, target_indices):
-        # self.verify_bitmap_consistency()
-        doc_num = self.get_doc_count()
+    def prepare_dpf_seq(self, target_indices, doc_num, col_num):
+        a, b = [], []
+        for i in range(col_num):
+            keys_a, keys_b = eq.keygen(doc_num)
+            # Reshape to a C-contiguous array (necessary for from_buffer)
+            alpha = eq.alpha(keys_a, keys_b)
+            x = alpha.astype(np.int32)
+
+            # change non-target columns to 0
+            if i not in target_indices:
+                for k in range(doc_num):
+                    r = random.randint(-100, 100)
+                    x[k] += r if r else 10  # avoid not adding anything
+
+            # # print(x)
+            x = x.tolist()
+            a.append([x, keys_a.tolist()])
+            b.append([x.copy(), keys_b.tolist()])
+
+        # print("=== SHAPE ", len(a), len(a[0]), len(a[0][1]), len(a[0][1][0]))
+        return a, b
+
+    def prepare_dpf_async(self, target_indices, doc_num, col_num):
         # the idea is that we want dpf for every column
         # the end results should be two chunks
         a, b = [], []
@@ -357,7 +379,7 @@ class ClientManager(models.Model):
         # wanna do something like this:
         # [[a[k] for k in range(j*batch, min(j*batch+batch, len(a)))] for j in range(math.ceil(len(a)/batch))]
         batch_size = 100
-        batch_count = math.ceil(self.bloom_filter_width / batch_size)
+        batch_count = math.ceil(col_num / batch_size)
         with concurrent.futures.ThreadPoolExecutor(max_workers=batch_count) as executor:
             batches = [
                 executor.submit(
@@ -366,7 +388,7 @@ class ClientManager(models.Model):
                     target_indices,
                     doc_num,
                     i * batch_size,
-                    min(i * batch_size + batch_size, self.bloom_filter_width),
+                    min(i * batch_size + batch_size, col_num),
                 )
                 for i in range(batch_count)
             ]
@@ -380,6 +402,19 @@ class ClientManager(models.Model):
 
         # self.verify_bitmap_consistency()
         return a, b
+
+    def prepare_dpf(self, target_indices):
+        # self.verify_bitmap_consistency()
+        self.ensure_one()
+        doc_num = self.get_doc_count()
+        if self.async_enabled:
+            return self.prepare_dpf_async(
+                target_indices, doc_num, self.bloom_filter_width
+            )
+        else:
+            return self.prepare_dpf_seq(
+                target_indices, doc_num, self.bloom_filter_width
+            )
 
     # prepare dpf secrets here and send to each partitions
     # should not send all secrets to central server/master
@@ -408,6 +443,7 @@ class ClientManager(models.Model):
                     self.account_ids[i],
                     i,
                     json.dumps(params[i]),
+                    True if self.async_enabled else False,
                 )
                 for i in range(2)
             ]
@@ -738,7 +774,7 @@ class ODoryAccount(models.Model):
 
     # prepare dpf secrets here and send to each partitions
     # should not send all secrets to central server/master
-    def search_keywords(self, y, secrets):
+    def search_keywords(self, y, secrets, async_enabled=False):
         uid, models = self.connect()
         if not uid:
             raise ValidationError(_("Connection Failed."))
@@ -748,7 +784,7 @@ class ODoryAccount(models.Model):
             self.password,
             "res.users",
             "server_search",
-            [[uid], y, secrets],
+            [[uid], y, secrets, async_enabled],
         )
 
         return res_ids

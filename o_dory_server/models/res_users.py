@@ -4,11 +4,49 @@ import ujson as json
 import logging, random, math
 import numpy as np
 import sycret
-import concurrent.futures
+import multiprocessing
+
+# force to use fork instead of spawn on mac os
+# ! this is not safe on mac os
+# https://bugs.python.org/issue33725
+multiprocessing.set_start_method("fork")
 
 _logger = logging.getLogger(__name__)
 
 eq = sycret.EqFactory(n_threads=10)
+
+
+def server_search_worker(outputs, cols, results, start, end):
+    # the difference is results is a shared memory 1d array
+    row_size = len(cols[0])
+    for i in range(start, end):
+        results[i] ^= outputs[i // row_size] & cols[i // row_size][i % row_size]
+
+
+def server_search_async(outputs, cols, results):
+    col_num = len(cols)
+    row_num = len(cols[0])
+    size = col_num * row_num
+    # results_sm is 1d array
+    results_sm = multiprocessing.Array("i", size)
+    nproc = min(multiprocessing.cpu_count(), size)
+    bsize = math.ceil(len(results_sm) / nproc)
+    procs = [None] * nproc
+
+    for i in range(nproc):
+        # split into chunks
+        start, end = i * bsize, min((i + 1) * bsize, len(results_sm))
+        p = multiprocessing.Process(
+            target=server_search_worker, args=(outputs, cols, results_sm, start, end)
+        )
+        p.start()
+        procs[i] = p
+
+    for p in procs:
+        p.join()
+    # now convert results_sm to results
+    for i in range(len(results_sm)):
+        results[i // row_num][i % row_num] = results_sm[i]
 
 
 class ResUsers(models.Model):
@@ -238,60 +276,18 @@ class ResUsers(models.Model):
 
         return all_ret
 
-    def server_search_seq(self, y, secrets, cols, results, bloom_filter_width):
-        for j, s in enumerate(secrets):
-            x, k = s
-            x = np.array(x, dtype=np.int32)
-            k = np.array(k, dtype=np.uint8)
-            output = eq.eval(y, x, k)
-            output = output.tolist()
-            for i in range(len(cols[j])):
-                results[j][i] ^= output[0] & cols[j][i]
+    def eval_dpf(self, y, secrets):
+        x, keys = secrets
+        x = np.array(x, dtype=np.int32)
+        keys = np.array(keys, dtype=np.uint8)
+        outputs = eq.eval(y, x, keys)
+        outputs = outputs.tolist()
+        return outputs
 
-    def dpf_eval(self, y, secrets, cols, start, end):
-        ret = []
-        for j in range(start, end):
-            s = secrets[j]
-            x, k = s
-            x = np.array(x, dtype=np.int32)
-            k = np.array(k, dtype=np.uint8)
-            output = eq.eval(y, x, k)
-            output = output.tolist()
-            ret.append(output)
-        return ret
-
-    def server_search_async(self, y, secrets, cols, results, bloom_filter_width):
-        # I'd like to try a shared mem approach in the future
-        # for now observing that numpy conversion and eval take most time
-        # we try to do concurrent future again to gather these values first
-        outputs = []
-        # batch keygen depends on bloom_filter_width
-        # wanna do something like this:
-        # [[a[k] for k in range(j*batch, min(j*batch+batch, len(a)))] for j in range(math.ceil(len(a)/batch))]
-        batch_size = 100
-        batch_count = math.ceil(bloom_filter_width / batch_size)
-        with concurrent.futures.ThreadPoolExecutor(max_workers=batch_count) as executor:
-            batches = [
-                executor.submit(
-                    ResUsers.dpf_eval,
-                    self,
-                    y,
-                    secrets,
-                    cols,
-                    i * batch_size,
-                    min(i * batch_size + batch_size, bloom_filter_width),
-                )
-                for i in range(batch_count)
-            ]
-
-        for batch in batches:
-            outputs_sub = batch.result()
-            outputs.extend(outputs_sub)
-
-        for j, s in enumerate(secrets):
-            output = outputs[j]
-            for i in range(len(results[j])):
-                results[j][i] ^= output[0] & cols[j][i]
+    def server_search_seq(self, outputs, cols, results, col_s, col_e, row_s, row_e):
+        for j in range(col_s, col_e):
+            for i in range(row_s, row_e):
+                results[j][i] ^= outputs[j] & cols[j][i]
 
     # server evals the secret
     def server_search(self, y, secrets, async_enabled=False):
@@ -302,12 +298,19 @@ class ResUsers(models.Model):
         bitmaps = folder_id.bitmaps_deserialize(bitmaps)
         cols, row_to_doc = folder_id.bitmaps_flip(bitmaps)
         doc_count = len(bitmaps)
-        bloom_filter_width = len(next(iter(bitmaps.values())))
+        bloom_filter_width = len(cols)
+        if not doc_count or not bloom_filter_width:
+            return json.dumps(([], list(row_to_doc.items()), doc_versions))
+
+        outputs = self.eval_dpf(y, secrets)
         results = [[0 for x in range(doc_count)] for y in range(bloom_filter_width)]
         if async_enabled:
-            self.server_search_async(y, secrets, cols, results, bloom_filter_width)
+            # raise ValidationError("Server Search Async currently not available")
+            server_search_async(outputs, cols, results)
         else:
-            self.server_search_seq(y, secrets, cols, results, bloom_filter_width)
+            self.server_search_seq(
+                outputs, cols, results, 0, bloom_filter_width, 0, doc_count
+            )
 
         _logger.warning("Done server search")
         # return results, list(row_to_doc.items()), doc_versions

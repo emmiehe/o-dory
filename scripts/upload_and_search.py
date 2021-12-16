@@ -500,12 +500,15 @@ def run(
     logging.info("Done")
     return search_time
 
+
 def plot_data(word_nums, fps, doc_nums, r, username, needle, auto_remove):
     data = []
     for word_num in word_nums:
         for fp in fps:
             for doc_num in doc_nums:
-                bf_width, hash_count = calc_bloom_filter_width_and_hash_count(word_num, fp)
+                bf_width, hash_count = calc_bloom_filter_width_and_hash_count(
+                    word_num, fp
+                )
                 search_time = run(
                     username,
                     bf_width,
@@ -519,6 +522,7 @@ def plot_data(word_nums, fps, doc_nums, r, username, needle, auto_remove):
                 data.append(search_time)
     return data
 
+
 def run_test():
     username = "test"
     needle = "needle"
@@ -526,13 +530,13 @@ def run_test():
     rounds = [False]
 
     # creating keyword number steps
-    word_nums = [2**i for i in range(13)]
+    word_nums = [2 ** i for i in range(13)]
 
     # false postive steps
     fps = [0.0001, 0.001, 0.01, 0.1]
 
     # doc num steps
-    doc_nums = [2**i for i in range(13)]
+    doc_nums = [2 ** i for i in range(13)]
 
     results = []
 
@@ -545,7 +549,8 @@ def run_test():
             plot_data(word_nums, [p], [doc], r, username, needle, auto_remove),
             "word_num",
             "fp 0.01 doc num 100 " + ("seq" if not r else "async"),
-        ] for r in rounds
+        ]
+        for r in rounds
     ]
 
     fp_data = [
@@ -554,16 +559,18 @@ def run_test():
             plot_data([word], fps, [doc], r, username, needle, auto_remove),
             "false positive rate",
             "word num 100 doc num 100 " + ("seq" if not r else "async"),
-        ] for r in rounds
+        ]
+        for r in rounds
     ]
-        
+
     doc_num_data = [
         [
             doc_nums,
             plot_data([word], [p], doc_nums, r, username, needle, auto_remove),
             "doc num",
             "word num 100 fp 0.01 " + ("seq" if not r else "async"),
-        ] for r in rounds
+        ]
+        for r in rounds
     ]
 
     return word_num_data, fp_data, doc_num_data
@@ -572,10 +579,10 @@ def run_test():
 def lineplot(x_data, y_data, x_label="", y_label="", title=""):
     # Create the plot object
     _, ax = plt.subplots()
-    
+
     # Plot the best fit line, set the linewidth (lw), color and
     # transparency (alpha) of the line
-    
+
     ax.plot(
         x_data[0],
         y_data[0],
@@ -607,9 +614,9 @@ if __name__ == "__main__":
         results = run_test()
         logging.info("Results: {}".format(results))
         for result in results:
-            r0 = result[0] 
+            r0 = result[0]
             lineplot([r0[0]], [r0[1]], r0[2], "time", r0[3])
-            # r0, r1 = result 
+            # r0, r1 = result
             # lineplot([r0[0], r1[0]], [r0[1], r1[1]], r0[2], "time", r0[3])
 
         sys.exit()

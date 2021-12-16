@@ -277,7 +277,9 @@ def prepare_doc_data(word_num, doc_num, needle):
         for i in range(doc_num)
     ]
 
-    add_needles = sorted(random.sample(range(doc_num), random.randint(1, doc_num // 2)))
+    add_needles = sorted(
+        random.sample(range(doc_num), random.randint(1, max(doc_num // 2, 1)))
+    )
     for i in add_needles:
         msgs[i] = msgs[i] + " " + needle
 
@@ -498,125 +500,105 @@ def run(
     logging.info("Done")
     return search_time
 
+def plot_data(word_nums, fps, doc_nums, r, username, needle, auto_remove):
+    data = []
+    for word_num in word_nums:
+        for fp in fps:
+            for doc_num in doc_nums:
+                bf_width, hash_count = calc_bloom_filter_width_and_hash_count(word_num, fp)
+                search_time = run(
+                    username,
+                    bf_width,
+                    hash_count,
+                    word_num,
+                    doc_num,
+                    needle,
+                    auto_remove,
+                    r,
+                )
+                data.append(search_time)
+    return data
 
 def run_test():
     username = "test"
     needle = "needle"
     auto_remove = 1
-    rounds = [False, True]
+    rounds = [False]
 
     # creating keyword number steps
-    word_nums = [100 * i for i in range(1, 51, 5)]
+    word_nums = [2**i for i in range(13)]
 
     # false postive steps
-    fps = [0.1, 0.01, 0.001]
-    fps = []
+    fps = [0.0001, 0.001, 0.01, 0.1]
 
     # doc num steps
-    doc_nums = [10, 100, 1000]
-    doc_nums = []
+    doc_nums = [2**i for i in range(13)]
 
     results = []
 
     # some static values
-    word, p, doc = 100, 0.1, 100
+    word, p, doc = 1024, 0.01, 1024
 
-    for r in rounds:
-        word_num_data = []
-        for word_num in word_nums:
-            bf_width, hash_count = calc_bloom_filter_width_and_hash_count(word_num, p)
-            search_time = run(
-                username,
-                bf_width,
-                hash_count,
-                word_num,
-                doc,
-                needle,
-                auto_remove,
-                r,
-            )
-            word_num_data.append(search_time)
-        if word_nums:
-            results.append(
-                [
-                    word_nums,
-                    word_num_data,
-                    "word num",
-                    "fp 0.01 doc num 100 " + ("seq" if not r else "async"),
-                ]
-            )
+    word_num_data = [
+        [
+            word_nums,
+            plot_data(word_nums, [p], [doc], r, username, needle, auto_remove),
+            "word_num",
+            "fp 0.01 doc num 100 " + ("seq" if not r else "async"),
+        ] for r in rounds
+    ]
 
-        fp_data = []
-        for fp in fps:
-            bf_width, hash_count = calc_bloom_filter_width_and_hash_count(word, fp)
-            search_time = run(
-                username,
-                bf_width,
-                hash_count,
-                word,
-                doc,
-                needle,
-                auto_remove,
-                r,
-            )
-            fp_data.append(search_time)
-        if fps:
-            results.append(
-                [
-                    fps,
-                    fp_data,
-                    "false positive rate",
-                    "word num 100 doc num 100 " + ("seq" if not r else "async"),
-                ]
-            )
+    fp_data = [
+        [
+            fps,
+            plot_data([word], fps, [doc], r, username, needle, auto_remove),
+            "false positive rate",
+            "word num 100 doc num 100 " + ("seq" if not r else "async"),
+        ] for r in rounds
+    ]
+        
+    doc_num_data = [
+        [
+            doc_nums,
+            plot_data([word], [p], doc_nums, r, username, needle, auto_remove),
+            "doc num",
+            "word num 100 fp 0.01 " + ("seq" if not r else "async"),
+        ] for r in rounds
+    ]
 
-        doc_num_data = []
-        for doc_num in doc_nums:
-            bf_width, hash_count = calc_bloom_filter_width_and_hash_count(word, p)
-            search_time = run(
-                username,
-                bf_width,
-                hash_count,
-                word,
-                doc_num,
-                needle,
-                auto_remove,
-                r,
-            )
-            doc_num_data.append(search_time)
-
-        if doc_nums:
-            results.append(
-                [
-                    doc_nums,
-                    doc_num_data,
-                    "doc num",
-                    "word num 100 fp 0.01 " + ("seq" if not r else "async"),
-                ]
-            )
-
-    return results
+    return word_num_data, fp_data, doc_num_data
 
 
 def lineplot(x_data, y_data, x_label="", y_label="", title=""):
     # Create the plot object
     _, ax = plt.subplots()
-
+    
     # Plot the best fit line, set the linewidth (lw), color and
     # transparency (alpha) of the line
-    for i in range(len(y_data)):
-        ax.plot(
-            x_data[i],
-            y_data[i],
-            lw=2,
-            color="#%03x" % random.randint(0, 0xFFFFFF),
-            alpha=1,
-        )
+    
+    ax.plot(
+        x_data[0],
+        y_data[0],
+        label="SEQ",
+        lw=2,
+        color="b",
+        alpha=1,
+    )
+
+    # ax.plot(
+    #     x_data[1],
+    #     y_data[1],
+    #     label="ASYNC",
+    #     lw=2,
+    #     color="g",
+    #     alpha=1,
+    # )
 
     # Label the axes and provide a title
     ax.set_title(title)
     ax.set_xlabel(x_label)
     ax.set_ylabel(y_label)
+    ax.legend()
     plt.savefig(title + ".png")
 
 
@@ -624,15 +606,11 @@ if __name__ == "__main__":
     if len(sys.argv[1:]) == 0:
         results = run_test()
         logging.info("Results: {}".format(results))
-        # results = [[[10, 30, 50, 70, 90, 110, 130, 150, 170, 190, 210, 230, 250, 270, 290, 310, 330, 350, 370, 390, 410, 430, 450, 470, 490], [0.4080650806427002, 0.4194481372833252, 0.4803929328918457, 0.555027961730957, 0.5245068073272705, 0.5304629802703857, 0.6047260761260986, 0.6451869010925293, 0.6935012340545654, 0.6320240497589111, 0.7806639671325684, 0.7112410068511963, 0.7591328620910645, 0.7521977424621582, 0.8009989261627197, 0.8078999519348145, 0.7861430644989014, 0.8221099376678467, 0.8917350769042969, 0.8750720024108887, 0.9052841663360596, 1.1183419227600098, 0.9726977348327637, 1.005824089050293, 1.0219829082489014], 'word num', 'fp 0.01 doc num 100 seq'], [[10, 30, 50, 70, 90, 110, 130, 150, 170, 190, 210, 230, 250, 270, 290, 310, 330, 350, 370, 390, 410, 430, 450, 470, 490], [0.32885289192199707, 0.36128807067871094, 0.3885209560394287, 0.41938281059265137, 0.5189428329467773, 0.4790620803833008, 0.5245151519775391, 0.5640840530395508, 0.576624870300293, 0.6404380798339844, 0.640679121017456, 0.6886041164398193, 0.7798347473144531, 0.726431131362915, 0.7810449600219727, 0.7955260276794434, 0.955265998840332, 0.8646731376647949, 0.939215898513794, 1.0636107921600342, 0.9696669578552246, 1.0329458713531494, 1.1084039211273193, 1.0796000957489014, 1.364253044128418], 'word num', 'fp 0.01 doc num 100 async']]
-        xs, ys = [], []
-        label = ""
-        for res in results:
-            x, y, label, title = res
-            xs.append(x)
-            ys.append(y)
-            lineplot([x], [y], label, "time", title)
-        lineplot(xs, ys, label, "time", "altogether")
+        for result in results:
+            r0 = result[0] 
+            lineplot([r0[0]], [r0[1]], r0[2], "time", r0[3])
+            # r0, r1 = result 
+            # lineplot([r0[0], r1[0]], [r0[1], r1[1]], r0[2], "time", r0[3])
 
         sys.exit()
     elif 0 < len(sys.argv[1:]) < 7:

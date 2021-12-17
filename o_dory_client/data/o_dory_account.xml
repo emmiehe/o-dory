@@ -4,9 +4,9 @@
 
     <record model="client.manager" id="client_demo_alice">
       <field name="name">Alice</field>
-      <field name="bloom_filter_width" eval="479"/>
+      <field name="bloom_filter_width" eval="9585"/>
       <field name="salt">somesalt</field>
-      <field name="hash_count" eval="3"/>
+      <field name="hash_count" eval="7"/>
     </record>
 
     <record id="account_alice1" model="o.dory.account">

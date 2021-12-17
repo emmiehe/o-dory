@@ -31,9 +31,9 @@ class ClientManager(models.Model):
     )
 
     bloom_filter_width = fields.Integer(
-        "Bitmap Width", default=479
+        "Bitmap Width", default=9585
     )  # this is actually bloom_filter width
-    hash_count = fields.Integer("Hash Count", default=3)
+    hash_count = fields.Integer("Hash Count", default=7)
 
     def _get_salt(self):
         return "".join(random.choices(string.ascii_uppercase + string.digits, k=20))

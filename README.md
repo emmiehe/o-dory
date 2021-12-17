@@ -29,13 +29,13 @@ Built with [Odoo](https://github.com/odoo/odoo).
 
 * run
   * `python3 odoo/odoo-bin --addons-path=odoo/addons,o-dory -d o_dory_server_one -i o_dory_server -p 8898 --limit-time-cpu 7200 --limit-time-real 7200`
-    * access server one [here](localhost:8898)
+    * access server one [here](http://localhost:8898)
     * login & pw: admin
   * `python3 odoo/odoo-bin --addons-path=odoo/addons,o-dory -d o_dory_server_two -i o_dory_server -p 8899 --limit-time-cpu 7200 --limit-time-real 7200`
-    * access server two [here](localhost:8899)
+    * access server two [here](http://localhost:8899)
     * login & pw: admin
   * `python3 odoo/odoo-bin --addons-path=odoo/addons,o-dory -d o_dory_client -i o_dory_client -p 8069 --limit-time-cpu 7200 --limit-time-real 7200`
-    * access client [here](localhost:8069)
+    * access client [here](http://localhost:8069)
     * login & pw: admin
   * User Alice is automatically created
   * To create more examples, please use the script:

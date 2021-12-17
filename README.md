@@ -3,13 +3,17 @@ O-DORY is a [DORY](https://www.usenix.org/conference/osdi20/presentation/dauterm
 Built with [Odoo](https://github.com/odoo/odoo).
 
 # Installation
-* get code
+* prepare a directory
   * `mkdir test-o-dory`
   * `cd test-o-dory`
+
+* get o-dory code
   * `git clone git@github.com:emmiehe/o-dory.git`
+
+* get odoo code
   * If you are only interested in testing out O-DORY, you can install this slightly lighter version of Odoo 15.0:
     * `git clone git@github.com:emmiehe/odoo.git --single-branch`
-    * If you want to learn more about Odoo and its source code, please follow the official [installation documentation](https://www.odoo.com/documentation/15.0/administration/install/install.html).
+  * If you want to learn more about Odoo and its source code, please follow the official [installation documentation](https://www.odoo.com/documentation/15.0/administration/install/install.html).
 
 * postgreSQL
   * Odoo uses PostgreSQL as database management system. Use postgres.app to download and install PostgreSQL (supported version: 10.0 and later). Create a new postgreSQL user either from the GUI or `sudo -u postgres createuser -s $USER`

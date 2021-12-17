@@ -70,75 +70,36 @@ def login_and_verify_access(url, db, username, password, target_models=[]):
 
 def create_user_server(url, db, login, pw, username):
     admin, models = login_and_verify_access(url, db, login, pw)
-    partner_id, user_id, folder_id = None, None, None
-    # search if user exists
-    partner_ids = models.execute_kw(
+    
+    partner_id = models.execute_kw(
         db,
         admin,
         pw,
         "res.partner",
-        "search",
-        [[["name", "=", username]]],
+        "create",
+        [{"name": username}],
     )
-    if partner_ids:
-        partner_id = partner_ids[0]
-    else:
-        partner_id = models.execute_kw(
-            db,
-            admin,
-            pw,
-            "res.partner",
-            "create",
-            [{"name": username}],
-        )
-
-    user_ids = models.execute_kw(
+    
+    user_id = models.execute_kw(
         db,
         admin,
         pw,
         "res.users",
-        "search",
-        [[["partner_id", "=", partner_id]]],
+        "create",
+        [{"login": username, "password": username, "partner_id": partner_id}],
+    )
+    logging.info(
+        "Created {}({}) on server {}({})".format(username, user_id, db, url)
     )
 
-    if user_ids:
-        user_id = user_ids[0]
-        logging.info(
-            "User {}({}) exists on server {}({})".format(username, user_id, db, url)
-        )
-    else:
-        user_id = models.execute_kw(
-            db,
-            admin,
-            pw,
-            "res.users",
-            "create",
-            [{"login": username, "password": username, "partner_id": partner_id}],
-        )
-        logging.info(
-            "Created {}({}) on server {}({})".format(username, user_id, db, url)
-        )
-
-    folder_ids = models.execute_kw(
+    folder_id = models.execute_kw(
         db,
         admin,
         pw,
         "server.folder",
-        "search",
-        [[["user_id", "=", user_id]]],
+        "create",
+        [{"user_id": user_id, "name": username}],
     )
-
-    if folder_ids:
-        folder_id = folder_ids[0]
-    else:
-        folder_id = models.execute_kw(
-            db,
-            admin,
-            pw,
-            "server.folder",
-            "create",
-            [{"user_id": user_id, "name": username}],
-        )
 
     return partner_id, user_id, folder_id
 

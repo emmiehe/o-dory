@@ -16,11 +16,11 @@ Built with [Odoo](https://github.com/odoo/odoo).
   * If you want to learn more about Odoo and its source code, please follow the official [installation documentation](https://www.odoo.com/documentation/15.0/administration/install/install.html).
 
 * postgreSQL
-  * Odoo uses PostgreSQL as database management system. Use postgres.app to download and install PostgreSQL (supported version: 10.0 and later). Create a new postgreSQL user either from the GUI or `sudo -u postgres createuser -s $USER`
+  * Odoo uses PostgreSQL as database management system. Use [postgres.app](https://postgresapp.com/) to download and install PostgreSQL (supported version: 10.0 and later). Create a new postgreSQL user either from the GUI or `sudo -u postgres createuser -s $USER`
 
 * dependencies
   * nodejs
-    * install nodejs (https://nodejs.org/en/download/)
+    * install [nodejs](https://nodejs.org/en/download/)
     * `sudo npm install -g rtlcss`
   * make sure your Python version is 3.7+
     * create a virtual env: `python3 -m venv odoo-venv-15`
@@ -29,13 +29,13 @@ Built with [Odoo](https://github.com/odoo/odoo).
 
 * run
   * `python3 odoo/odoo-bin --addons-path=odoo/addons,o-dory -d o_dory_server_one -i o_dory_server -p 8898 --limit-time-cpu 7200 --limit-time-real 7200`
-    * access server one from localhost:8898
+    * access server one [here](localhost:8898)
     * login & pw: admin
   * `python3 odoo/odoo-bin --addons-path=odoo/addons,o-dory -d o_dory_server_two -i o_dory_server -p 8899 --limit-time-cpu 7200 --limit-time-real 7200`
-    * access server two from localhost:8899
+    * access server two [here](localhost:8899)
     * login & pw: admin
   * `python3 odoo/odoo-bin --addons-path=odoo/addons,o-dory -d o_dory_client -i o_dory_client -p 8069 --limit-time-cpu 7200 --limit-time-real 7200`
-    * access client from localhost:8069
+    * access client [here](localhost:8069)
     * login & pw: admin
   * User Alice is automatically created
   * To create more examples, please use the script:

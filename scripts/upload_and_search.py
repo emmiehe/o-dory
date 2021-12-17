@@ -414,11 +414,9 @@ def run(
 
             expected_res = set(expected_result)
 
-            if search_res.intersection(expected_res) == expected_res:
-                logging.info("Search result passed")
-            else:
-                logging.error("False results")
-
+            assert(search_res.intersection(expected_res) == expected_res)
+            logging.info("Search result passed")
+            
             if auto_remove:
                 delete_data = []
                 for doc in doc_ids:

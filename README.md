@@ -2,6 +2,9 @@
 [O-DORY](o_dory_report.pdf) is a [DORY](https://www.usenix.org/conference/osdi20/presentation/dauterman-dory)-style end-to-end encrypted file-storing application. It allows secure and efficient server-side keyword search and document retrieval without exposing search access patterns. 
 Built with [Odoo](https://github.com/odoo/odoo).
 
+# DEMO
+![demo](scripts/imgs/demo.gif)
+
 # Installation
 * prepare a directory
   * `mkdir test-o-dory`
@@ -37,6 +40,7 @@ Built with [Odoo](https://github.com/odoo/odoo).
   * `python3 odoo/odoo-bin --addons-path=odoo/addons,o-dory -d o_dory_client -i o_dory_client -p 8069 --limit-time-cpu 7200 --limit-time-real 7200`
     * access client [here](http://localhost:8069)
     * login & pw: admin
+  * If you encounter a memory limit issue starting Odoo servers on macOS Monterey, you might want to look at [this](https://github.com/odoo/odoo/issues/79112). 
   * User Alice is automatically created
   * To create more examples, please use the script:
     * `python3 o-dory/scripts/upload_and_search.py bob 100 0.01 10 needle 0 0`
